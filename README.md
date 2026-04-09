@@ -37,13 +37,13 @@ A [GitHub CLI](https://cli.github.com/) extension to interactively browse your s
 gh extension install kylebrodeur/gh-my-starred
 ```
 
-### Via Skills CLI (npx skills / agentskills.io)
+### Via Skills CLI (npx skills)
 
 ```bash
 npx skills install kylebrodeur/gh-my-starred
 ```
 
-This installs the skill to the appropriate location for your AI agent (Claude Code, Copilot, PI, etc.) based on the standard agentskills.io format.
+This installs the skill to the appropriate location for your AI agent (Claude Code, Copilot, PI, etc.) based on the agentskills.io standard.
 
 ### Manual Installation
 
@@ -222,7 +222,7 @@ This prints guidance for AI agents on how to programatically interact with the e
 This extension is listed in multiple registries:
 
 - **GitHub CLI Extensions**: `gh extension install kylebrodeur/gh-my-starred`
-- **agentskills.io**: `npx skills install kylebrodeur/gh-my-starred`
+- **npx skills**: `npx skills install kylebrodeur/gh-my-starred`
 - **Claude Code**: Auto-discovers `.claude/skills/gh-my-starred/SKILL.md`
 - **GitHub Copilot**: Auto-discovers `.github/skills/gh-my-starred/SKILL.md`
 - **PI Extensions**: Auto-discovers `.pi/extensions/gh-my-starred.ts`
@@ -232,8 +232,8 @@ This extension is listed in multiple registries:
 
 AI assistants can discover this tool via:
 
-1. **agentskills.io** - `npx skills install kylebrodeur/gh-my-starred`
-2. **SKILL.md (root)** - agentskills.io compatible format
+1. **npx skills** - Installs via `npx skills install kylebrodeur/gh-my-starred`
+2. **SKILL.md (root)** - Standard skill format
 3. **Claude Code skill** - `.claude/skills/gh-my-starred/SKILL.md`
 4. **GitHub Copilot skill** - `.github/skills/gh-my-starred/SKILL.md`
 5. **PI extension** - Provides `starred_repos` tool
