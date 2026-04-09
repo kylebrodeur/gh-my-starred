@@ -31,6 +31,8 @@ gh my-starred [options] [limit]
 | `-v, --version` | Show version number |
 | `-j, --json` | Output as JSON array (pipeable, no interactive mode) |
 | `--ai` | Show AI assistant documentation |
+| `--cache` | Force use cached data |
+| `--refresh` | Force refresh cache |
 
 ### Arguments
 

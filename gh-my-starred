@@ -4,7 +4,10 @@ set -e
 # gh-my-starred: Interactive browser for your GitHub starred repositories
 # Usage: gh my-starred [options] [limit]
 
-VERSION="1.1.0"
+VERSION="1.3.0"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/gh-my-starred"
+CACHE_FILE="$CACHE_DIR/starred-repos.json"
+CACHE_TTL="${GH_STARRED_CACHE_TTL:-3600}"  # Default 1 hour in seconds
 
 show_help() {
   cat << 'EOF'
@@ -17,31 +20,36 @@ OPTIONS
   -h, --help      Show this help message
   -v, --version   Show version number
   -j, --json      Output as JSON (no interactive mode)
+  --refresh       Force refresh cache
   --ai            Show AI assistant documentation
 
 ARGS
   limit           Maximum number of repositories to fetch (default: all)
 
+ENVIRONMENT
+  GH_STARRED_CACHE_TTL   Cache time-to-live in seconds (default: 3600 = 1 hour)
+
 INTERACTIVE KEYS
   ↑/↓      Navigate
   Enter    Open selected repo in browser
   Ctrl-C   Exit
+  Ctrl-R   Refresh cache and reload
 
 REQUIREMENTS
   - GitHub CLI (gh) - authenticated
   - fzf (https://github.com/junegunn/fzf) - for interactive mode
 
 EXAMPLES
-  gh my-starred              # Browse all starred repos
+  gh my-starred              # Browse all starred repos (uses cache if fresh)
   gh my-starred 100          # Browse last 100 starred repos
   gh my-starred --json       # Output full JSON of all starred repos
   gh my-starred --json 50    # Output JSON of last 50 starred repos
+  gh my-starred --refresh    # Force refresh cache
   gh my-starred --ai         # Show AI documentation
 EOF
 }
 
 show_ai_docs() {
-  # Look for SKILL.md in various locations
   local skill_file=""
   if [ -f "$(dirname "$0")/SKILL.md" ]; then
     skill_file="$(dirname "$0")/SKILL.md"
@@ -54,10 +62,9 @@ show_ai_docs() {
   if [ -n "$skill_file" ] && [ -f "$skill_file" ]; then
     cat "$skill_file"
   else
-    # Fallback to URL
     echo "# AI Assistant Guide for gh-my-starred"
     echo ""
-    echo "Full documentation available at: https://github.com/kylebrodeur/gh-my-starred/blob/main/SKILL.md"
+    echo "Full documentation: https://github.com/kylebrodeur/gh-my-starred/blob/main/SKILL.md"
     echo ""
     echo "Quick reference:"
     echo "  gh my-starred --json | jq '.[] | select(.language == \"Go\")'"
@@ -65,49 +72,116 @@ show_ai_docs() {
   fi
 }
 
-show_version() {
-  echo "gh-my-starred v${VERSION}"
+show_version() { echo "gh-my-starred v${VERSION}"; }
+
+# Cache functions
+is_cache_valid() {
+  [ -f "$CACHE_FILE" ] && [ -s "$CACHE_FILE" ] && return 0 || return 1
+}
+
+is_cache_fresh() {
+  if ! is_cache_valid; then return 1; fi
+  local cache_age=$(( $(date +%s) - $(stat -c %Y "$CACHE_FILE" 2>/dev/null || stat -f %m "$CACHE_FILE" 2>/dev/null || echo 0) ))
+  [ $cache_age -lt $CACHE_TTL ]
+}
+
+get_cache_mtime() {
+  stat -c %Y "$CACHE_FILE" 2>/dev/null || stat -f %m "$CACHE_FILE" 2>/dev/null || echo 0
+}
+
+ensure_cache_dir() { mkdir -p "$CACHE_DIR"; }
+
+# Quick check: Get the latest starred repo timestamp from API
+get_latest_starred_date() {
+  gh api "user/starred?per_page=1" --jq '.[0].starred_at' 2>/dev/null || echo ""
+}
+
+# Check if update is needed by comparing latest starred date
+check_update_needed() {
+  local cache_latest_date=$(jq -r 'sort_by(.starred_at) | reverse | .[0].starred_at' "$CACHE_FILE" 2>/dev/null || echo "")
+  local api_latest_date=$(get_latest_starred_date)
+  
+  if [ -z "$api_latest_date" ]; then
+    echo "Cannot check for updates (API error), using cache" >&2
+    return 1  # Use cache
+  fi
+  
+  if [ "$api_latest_date" != "$cache_latest_date" ]; then
+    echo "New starred repositories detected (or cache outdated)" >&2
+    return 0  # Update needed
+  fi
+  
+  return 1  # No update needed
+}
+
+fetch_all_starred() {
+  local output_file="${1:-/dev/stdout}"
+  local per_page=100
+  local page=1
+  local total_fetched=0
+  
+  echo "Fetching starred repositories (may take a moment for 1k+ stars)..." >&2
+  
+  # Start with empty array
+  echo "[]" > "$output_file.tmp"
+  
+  while true; do
+    local page_file=$(mktemp)
+    
+    if ! gh api "user/starred?per_page=$per_page&page=$page&sort=created&direction=desc" --jq '.' > "$page_file" 2>/dev/null; then
+      rm -f "$page_file"
+      echo "Error: Failed to fetch page $page" >&2
+      break
+    fi
+    
+    local count=$(jq 'length' "$page_file")
+    
+    if [ "$count" -eq 0 ]; then
+      rm -f "$page_file"
+      break
+    fi
+    
+    # Merge into temp file
+    jq -s '.[0] + .[1]' "$output_file.tmp" "$page_file" > "$output_file.tmp2" && \
+      mv "$output_file.tmp2" "$output_file.tmp"
+    rm -f "$page_file"
+    
+    total_fetched=$((total_fetched + count))
+    local cache_total=$(is_cache_valid && jq 'length' "$CACHE_FILE" 2>/dev/null || echo "?")
+    echo -ne "\rFetched $total_fetched repos (cached: $cache_total)..." >&2
+    
+    [ "$count" -lt "$per_page" ] && break
+    page=$((page + 1))
+  done
+  
+  echo "" >&2
+  mv "$output_file.tmp" "$output_file"
 }
 
 # Parse arguments
 JSON_MODE=false
+FORCE_REFRESH=false
 LIMIT=""
 POSITIONAL=()
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    -h|--help)
-      show_help
-      exit 0
-      ;;
-    -v|--version)
-      show_version
-      exit 0
-      ;;
-    -j|--json)
-      JSON_MODE=true
-      shift
-      ;;
-    --ai)
-      show_ai_docs
-      exit 0
-      ;;
+    -h|--help) show_help; exit 0 ;;
+    -v|--version) show_version; exit 0 ;;
+    -j|--json) JSON_MODE=true; shift ;;
+    --refresh) FORCE_REFRESH=true; shift ;;
+    --ai) show_ai_docs; exit 0 ;;
     -*)
       echo "Error: Unknown option $1" >&2
       echo "Run 'gh my-starred --help' for usage" >&2
       exit 1
       ;;
-    *)
-      POSITIONAL+=("$1")
-      shift
-      ;;
+    *) POSITIONAL+=("$1"); shift ;;
   esac
 done
 
-# Set positional arguments
 set -- "${POSITIONAL[@]}"
 
-# Handle limit argument
 if [ $# -gt 0 ]; then
   LIMIT="$1"
   if ! [[ "$LIMIT" =~ ^[0-9]+$ ]]; then
@@ -128,51 +202,89 @@ if ! gh auth status &> /dev/null; then
   exit 1
 fi
 
-# Fetch starred repos
-fetch_repos_json() {
-  if [ -n "$LIMIT" ]; then
-    gh api --paginate "user/starred?per_page=100" --jq '.' | jq --argjson limit "$LIMIT" '.[:$limit]'
+# Determine if we need to refresh cache
+REFRESH_NEEDED=false
+
+if [ "$FORCE_REFRESH" = true ]; then
+  echo "Force refresh requested..." >&2
+  REFRESH_NEEDED=true
+elif ! is_cache_valid; then
+  echo "No cache found, fetching..." >&2
+  REFRESH_NEEDED=true
+elif ! is_cache_fresh; then
+  echo "Cache is stale (>$CACHE_TTL seconds old)..." >&2
+  # Check if there are actually new stars before fetching
+  if check_update_needed; then
+    REFRESH_NEEDED=true
   else
-    gh api --paginate user/starred --jq '.'
+    echo "No new starred repos detected, using cached data" >&2
+    REFRESH_NEEDED=false
+  fi
+fi
+
+# Refresh cache if needed
+if [ "$REFRESH_NEEDED" = true ]; then
+  ensure_cache_dir
+  fetch_all_starred "$CACHE_FILE"
+fi
+
+if ! is_cache_valid; then
+  echo "Error: No cached data available. Check gh authentication." >&2
+  exit 1
+fi
+
+# Output functions
+get_json_data() {
+  if [ -n "$LIMIT" ]; then
+    jq --argjson limit "$LIMIT" '.[:$limit]' "$CACHE_FILE"
+  else
+    cat "$CACHE_FILE"
   fi
 }
 
-fetch_repos_names() {
+get_names_data() {
   if [ -n "$LIMIT" ]; then
-    gh api --paginate "user/starred?per_page=100" --jq '.[].full_name' | head -n "$LIMIT"
+    jq -r '.[].full_name' "$CACHE_FILE" | head -n "$LIMIT"
   else
-    gh api --paginate user/starred --jq '.[].full_name'
+    jq -r '.[].full_name' "$CACHE_FILE"
   fi
 }
 
-# JSON mode: output JSON and exit
+# JSON mode
 if [ "$JSON_MODE" = true ]; then
-  fetch_repos_json
+  get_json_data
   exit 0
 fi
 
-# Interactive mode: requires fzf
+# Interactive mode
 if ! command -v fzf &> /dev/null; then
   echo "Error: fzf is required but not installed." >&2
   echo "Install: https://github.com/junegunn/fzf#installation" >&2
   exit 1
 fi
 
-# Build header for interactive mode
-if [ -n "$LIMIT" ]; then
-  header="Enter: Open in Browser | Ctrl-C: Exit | Showing: $LIMIT repos"
-else
-  header="Enter: Open in Browser | Ctrl-C: Exit | Showing: all repos"
-fi
+# Build header with cache info
+TOTAL_COUNT=$(jq 'length' "$CACHE_FILE")
+CACHE_AGE=$(( ($(date +%s) - $(get_cache_mtime)) / 60 ))  # minutes
+header="$TOTAL_COUNT repos | Cache: ${CACHE_AGE}m ago | Ctrl-R: Refresh"
 
-echo "Fetching starred repositories..." >&2
+# Create temp file for refresh command
+REFRESH_CMD=$(mktemp)
+echo "#!/bin/bash" > "$REFRESH_CMD"
+echo "gh my-starred --json --refresh 2>/dev/null | jq -r '.[].full_name'" >> "$REFRESH_CMD"
+chmod +x "$REFRESH_CMD"
 
-selected=$(fetch_repos_names | \
-  fzf --preview 'gh repo view {}' \
-      --preview-window 'right:60%' \
+echo "Loading $TOTAL_COUNT repositories..." >&2
+
+selected=$(get_names_data | \
+  fzf --preview 'gh repo view {} 2>/dev/null || echo "Loading..."' \
+      --preview-window 'right:60%:wrap' \
       --header "$header" \
       --prompt "Starred repos> " \
-      --height '80%')
+      --height '80%' \
+      --bind "ctrl-r:reload($REFRESH_CMD || get_names_data)")
+
+rm -f "$REFRESH_CMD"
 
 if [ -n "$selected" ]; then
   gh repo view "$selected" --web

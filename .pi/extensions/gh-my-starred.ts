@@ -2,7 +2,7 @@
  * gh-my-starred pi Extension
  *
  * Provides a `starred_repos` tool for AI agents to browse and query
- * the user's GitHub starred repositories.
+ * the user's GitHub starred repositories with caching support.
  *
  * Requires: gh cli with authentication
  *           gh-my-starred extension installed: gh extension install kylebrodeur/gh-my-starred
@@ -10,6 +10,9 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
 
 interface StarredRepo {
   full_name: string;
@@ -19,6 +22,21 @@ interface StarredRepo {
   html_url: string;
   topics: string[];
   updated_at: string;
+}
+
+// Cache configuration
+const CACHE_DIR = process.env.XDG_CACHE_HOME 
+  ? join(process.env.XDG_CACHE_HOME, "gh-my-starred")
+  : join(homedir(), ".cache", "gh-my-starred");
+const CACHE_FILE = join(CACHE_DIR, "starred-repos.json");
+
+async function loadCachedRepos(): Promise<StarredRepo[] | null> {
+  try {
+    const data = await readFile(CACHE_FILE, "utf-8");
+    return JSON.parse(data) as StarredRepo[];
+  } catch {
+    return null;
+  }
 }
 
 export default function ghMyStarredExtension(pi: ExtensionAPI) {
@@ -53,51 +71,66 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       sortBy: Type.Optional(Type.String({
         enum: ["stars", "updated", "name"],
         description: "Sort field (default: stars desc)"
+      })),
+      refresh: Type.Optional(Type.Boolean({
+        description: "Force refresh cache before querying (default: false, uses cached data)"
       }))
     }),
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const limit = Math.min(params.limit ?? 100, 500);
-      const { language, topic, search, minStars, sortBy } = params;
+      const { language, topic, search, minStars, sortBy, refresh } = params;
 
       onUpdate?.({
-        content: [{ type: "text", text: `Fetching ${limit} starred repositories...` }]
+        content: [{ type: "text", text: refresh ? "Refreshing starred repositories cache..." : "Loading starred repositories..." }]
       });
 
-      // Check if gh is available
-      try {
-        const ghCheck = await pi.exec("gh", ["--version"], { signal, timeout: 5000 });
-        if (ghCheck.code !== 0) {
+      let repos: StarredRepo[] | null = null;
+
+      // Try cache first unless refresh is requested
+      if (!refresh) {
+        repos = await loadCachedRepos();
+        if (repos) {
+          onUpdate?.({
+            content: [{ type: "text", text: `Using cached data (${repos.length} repos). Use refresh: true to update.` }]
+          });
+        }
+      }
+
+      // Fetch from API if no cache or refresh requested
+      if (!repos) {
+        // Check gh availability
+        try {
+          const ghCheck = await pi.exec("gh", ["--version"], { signal, timeout: 5000 });
+          if (ghCheck.code !== 0) {
+            return {
+              content: [{ type: "text", text: "Error: GitHub CLI (gh) is not installed." }],
+              isError: true
+            };
+          }
+        } catch {
           return {
-            content: [{ type: "text", text: "Error: GitHub CLI (gh) is not installed. Install from https://cli.github.com/" }],
+            content: [{ type: "text", text: "Error: GitHub CLI not available" }],
             isError: true
           };
         }
-      } catch (e) {
-        return {
-          content: [{ type: "text", text: "Error: GitHub CLI (gh) is not installed or not in PATH" }],
-          isError: true
-        };
-      }
 
-      // Fetch starred repos via gh
-      let repos: StarredRepo[];
-      try {
+        // Fetch via gh my-starred --json to populate cache
         const result = await pi.exec("gh", ["my-starred", "--json", String(limit)], {
           signal,
-          timeout: 30000
+          timeout: 120000 // 2 minutes for large star lists
         });
 
         if (result.code !== 0) {
-          // Try direct gh api fallback
+          // Try fallback - just gh api
           const fallback = await pi.exec("gh", [
             "api", "--paginate", "user/starred",
             "--jq", "."
-          ], { signal, timeout: 30000 });
+          ], { signal, timeout: 120000 });
 
           if (fallback.code !== 0) {
             return {
-              content: [{ type: "text", text: `Error fetching starred repos: ${result.stderr || fallback.stderr}` }],
+              content: [{ type: "text", text: `Error: ${result.stderr || fallback.stderr}` }],
               isError: true
             };
           }
@@ -105,11 +138,6 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
         } else {
           repos = JSON.parse(result.stdout);
         }
-      } catch (e) {
-        return {
-          content: [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }],
-          isError: true
-        };
       }
 
       if (!Array.isArray(repos) || repos.length === 0) {
