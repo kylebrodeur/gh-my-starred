@@ -97,6 +97,47 @@ g my-starred --json | jq -r '.[] | [.full_name, .stargazers_count, .language] | 
 | `Enter` | Open selected repo in browser |
 | `Ctrl-C` | Exit |
 
+## PI Extension
+
+This repository also includes a **PI extension** that provides a native `starred_repos` tool for AI agents.
+
+### PI Extension Installation
+
+Copy or symlink the extension to your PI extensions directory:
+
+```bash
+# Global installation (recommended)
+mkdir -p ~/.pi/agent/extensions/
+cp .pi/extensions/gh-my-starred.ts ~/.pi/agent/extensions/
+
+# Or project-local
+mkdir -p .pi/extensions/
+ln -s .pi/extensions/gh-my-starred.ts ../.pi/extensions/
+```
+
+Then reload PI with `/reload`.
+
+### PI Tool: `starred_repos`
+
+Once installed, AI agents in PI can use the `starred_repos` tool:
+
+| Parameter | Description |
+|-----------|-------------|
+| `limit` | Max repos to return (default: 100, max: 500) |
+| `language` | Filter by programming language |
+| `topic` | Filter by topic tag |
+| `search` | Fuzzy search in name/description |
+| `minStars` | Minimum stargazer count |
+| `sortBy` | Sort by: `stars`, `updated`, or `name` |
+
+### PI Command: `/starred`
+
+Open the interactive fzf browser from within PI:
+```
+/starred      # Browse starred repos
+/starred 50   # Limit to 50 repos
+```
+
 ## AI Assistant Support
 
 This extension includes built-in documentation for AI assistants. Run:

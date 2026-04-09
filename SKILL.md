@@ -104,6 +104,27 @@ g my-starred --json | jq '.[] | select(.updated_at > (now - 2592000) | todateiso
 gh my-starred --json | jq -r '.[].language // "null"' | sort | uniq -c | sort -rn
 ```
 
+## PI Extension
+
+This skill includes a [PI](https://pi.io) extension for native integration. When PI loads the skill, it registers a `starred_repos` tool that AI agents can use directly.
+
+### PI Tool Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | number | Maximum repos to return (default: 100) |
+| `language` | string | Filter by programming language |
+| `topic` | string | Filter by topic tag |
+| `search` | string | Search in name/description |
+| `minStars` | number | Minimum star count |
+| `sortBy` | string | Sort field: `stars`, `updated`, or `name` |
+
+### PI Command
+
+```
+/starred [limit]  # Launch interactive fzf browser
+```
+
 ## Requirements
 
 - GitHub CLI (`gh`) with authentication
