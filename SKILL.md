@@ -1,0 +1,111 @@
+---
+name: gh-my-starred
+description: GitHub CLI extension for browsing starred repositories with AI-accessible JSON output
+---
+
+# gh-my-starred
+
+Browse and query your GitHub starred repositories interactively or programmatically.
+
+## Installation
+
+```bash
+skills install kylebrodeur/gh-my-starred
+```
+
+Or use the GitHub CLI:
+```bash
+gh extension install kylebrodeur/gh-my-starred
+```
+
+## Usage
+
+### Interactive Mode
+Browse your starred repos with fuzzy search and preview:
+```bash
+gh my-starred
+gh my-starred 100  # limit to 100 most recent
+```
+
+### JSON Mode (Programmatic Access)
+Get structured JSON data for all starred repos:
+```bash
+gh my-starred --json
+gh my-starred --json 50  # limit to 50
+```
+
+## JSON Schema
+
+Each repository object in `--json` output includes:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `full_name` | string | "owner/repo" format identifier |
+| `description` | string | Repository description text |
+| `stargazers_count` | integer | Number of GitHub stars |
+| `language` | string | Primary programming language |
+| `html_url` | string | Repository web URL |
+| `topics` | string[] | Repository topic tags |
+| `updated_at` | string | ISO 8601 timestamp |
+
+## Common Operations
+
+### Filter by Language
+```bash
+gh my-starred --json | jq '.[] | select(.language == "Go") | .full_name' -r
+```
+
+### Filter by Topic
+```bash
+gh my-starred --json | jq '.[] | select(.topics | index("cli")) | .full_name'
+```
+
+### Sort by Stars
+```bash
+gh my-starred --json | jq 'sort_by(.stargazers_count) | reverse | .[:10]'
+```
+
+### Export to CSV
+```bash
+gh my-starred --json | jq -r '.[] | [.full_name, .stargazers_count, .language] | @csv'
+```
+
+### Find Unpopular Gems
+```bash
+gh my-starred --json | jq '.[] | select(.stargazers_count < 100) | ["⭐" + (.stargazers_count | tostring), .full_name] | @tsv' -r
+```
+
+## When to Use This Skill
+
+- **Finding repos**: "Search my starred repos for anything about X"
+- **Analysis**: "What languages/topics are most common in my stars?"
+- **Export**: "Create a list of my starred repos for documentation"
+- **Discovery**: "Show me my starred Python testing tools"
+
+## Options
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output JSON array instead of interactive mode |
+| `--ai` | Show AI documentation |
+| `--help` | Show usage help |
+| `--version` | Show version |
+
+## Examples
+
+```bash
+# Find all machine learning repos in your stars
+gh my-starred --json | jq '.[] | select(.topics | index("machine-learning")) | .full_name'
+
+# Get repos updated in the last month
+g my-starred --json | jq '.[] | select(.updated_at > (now - 2592000) | todateiso8601) | .full_name'
+
+# List unique languages you've starred
+gh my-starred --json | jq -r '.[].language // "null"' | sort | uniq -c | sort -rn
+```
+
+## Requirements
+
+- GitHub CLI (`gh`) with authentication
+- `fzf` (for interactive mode only)
+- `jq` (recommended for JSON queries)

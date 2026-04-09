@@ -2,75 +2,142 @@
 set -e
 
 # gh-my-starred: Interactive browser for your GitHub starred repositories
-# Usage: gh my-starred [limit]
-#   limit: Maximum number of repos to fetch (default: all)
+# Usage: gh my-starred [options] [limit]
+
+VERSION="1.1.0"
 
 show_help() {
   cat << 'EOF'
 gh my-starred - Browse your starred GitHub repositories interactively
 
 USAGE
-  gh my-starred [limit]
+  gh my-starred [options] [limit]
 
-FLAGS
-  limit    Maximum number of repositories to fetch (default: all)
+OPTIONS
+  -h, --help      Show this help message
+  -v, --version   Show version number
+  -j, --json      Output as JSON (no interactive mode)
+  --ai            Show AI assistant documentation
 
-KEYS
+ARGS
+  limit           Maximum number of repositories to fetch (default: all)
+
+INTERACTIVE KEYS
   ↑/↓      Navigate
   Enter    Open selected repo in browser
   Ctrl-C   Exit
 
 REQUIREMENTS
-  - GitHub CLI (gh)
-  - fzf (https://github.com/junegunn/fzf)
+  - GitHub CLI (gh) - authenticated
+  - fzf (https://github.com/junegunn/fzf) - for interactive mode
 
 EXAMPLES
-  gh my-starred       # Browse all starred repos
-  gh my-starred 100   # Browse last 100 starred repos
+  gh my-starred              # Browse all starred repos
+  gh my-starred 100          # Browse last 100 starred repos
+  gh my-starred --json       # Output full JSON of all starred repos
+  gh my-starred --json 50    # Output JSON of last 50 starred repos
+  gh my-starred --ai         # Show AI documentation
 EOF
 }
 
-# Check for help flag
-if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-  show_help
-  exit 0
+show_ai_docs() {
+  # Look for SKILL.md in various locations
+  local skill_file=""
+  if [ -f "$(dirname "$0")/SKILL.md" ]; then
+    skill_file="$(dirname "$0")/SKILL.md"
+  elif [ -f "$(dirname "$(readlink -f "$0")")/SKILL.md" ]; then
+    skill_file="$(dirname "$(readlink -f "$0")")/SKILL.md"
+  elif [ -f "$HOME/.local/share/gh/extensions/gh-my-starred/SKILL.md" ]; then
+    skill_file="$HOME/.local/share/gh/extensions/gh-my-starred/SKILL.md"
+  fi
+
+  if [ -n "$skill_file" ] && [ -f "$skill_file" ]; then
+    cat "$skill_file"
+  else
+    # Fallback to URL
+    echo "# AI Assistant Guide for gh-my-starred"
+    echo ""
+    echo "Full documentation available at: https://github.com/kylebrodeur/gh-my-starred/blob/main/SKILL.md"
+    echo ""
+    echo "Quick reference:"
+    echo "  gh my-starred --json | jq '.[] | select(.language == \"Go\")'"
+    echo "  gh my-starred --json | jq 'sort_by(.stargazers_count) | reverse | .[:10]'"
+  fi
+}
+
+show_version() {
+  echo "gh-my-starred v${VERSION}"
+}
+
+# Parse arguments
+JSON_MODE=false
+LIMIT=""
+POSITIONAL=()
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -v|--version)
+      show_version
+      exit 0
+      ;;
+    -j|--json)
+      JSON_MODE=true
+      shift
+      ;;
+    --ai)
+      show_ai_docs
+      exit 0
+      ;;
+    -*)
+      echo "Error: Unknown option $1" >&2
+      echo "Run 'gh my-starred --help' for usage" >&2
+      exit 1
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+      ;;
+  esac
+done
+
+# Set positional arguments
+set -- "${POSITIONAL[@]}"
+
+# Handle limit argument
+if [ $# -gt 0 ]; then
+  LIMIT="$1"
+  if ! [[ "$LIMIT" =~ ^[0-9]+$ ]]; then
+    echo "Error: limit must be a positive number" >&2
+    exit 1
+  fi
 fi
 
-# Check dependencies
-if ! command -v fzf &> /dev/null; then
-  echo "Error: fzf is required but not installed." >&2
-  echo "Install: https://github.com/junegunn/fzf#installation" >&2
-  exit 1
-fi
-
+# Check gh authentication
 if ! command -v gh &> /dev/null; then
   echo "Error: GitHub CLI (gh) is required but not installed." >&2
   echo "Install: https://cli.github.com/" >&2
   exit 1
 fi
 
-# Check gh authentication
 if ! gh auth status &> /dev/null; then
   echo "Error: Not authenticated with GitHub CLI. Run: gh auth login" >&2
   exit 1
 fi
 
-LIMIT="${1:-}"
-
-# Build the list of starred repos
-if [ -n "$LIMIT" ]; then
-  # Validate limit is a number
-  if ! [[ "$LIMIT" =~ ^[0-9]+$ ]]; then
-    echo "Error: limit must be a positive number" >&2
-    exit 1
-  fi
-  header="Enter: Open in Browser | Ctrl-C: Exit | Showing: $LIMIT repos"
-else
-  header="Enter: Open in Browser | Ctrl-C: Exit | Showing: all repos"
-fi
-
 # Fetch starred repos
-fetch_repos() {
+fetch_repos_json() {
+  if [ -n "$LIMIT" ]; then
+    gh api --paginate "user/starred?per_page=100" --jq '.' | jq --argjson limit "$LIMIT" '.[:$limit]'
+  else
+    gh api --paginate user/starred --jq '.'
+  fi
+}
+
+fetch_repos_names() {
   if [ -n "$LIMIT" ]; then
     gh api --paginate "user/starred?per_page=100" --jq '.[].full_name' | head -n "$LIMIT"
   else
@@ -78,9 +145,29 @@ fetch_repos() {
   fi
 }
 
+# JSON mode: output JSON and exit
+if [ "$JSON_MODE" = true ]; then
+  fetch_repos_json
+  exit 0
+fi
+
+# Interactive mode: requires fzf
+if ! command -v fzf &> /dev/null; then
+  echo "Error: fzf is required but not installed." >&2
+  echo "Install: https://github.com/junegunn/fzf#installation" >&2
+  exit 1
+fi
+
+# Build header for interactive mode
+if [ -n "$LIMIT" ]; then
+  header="Enter: Open in Browser | Ctrl-C: Exit | Showing: $LIMIT repos"
+else
+  header="Enter: Open in Browser | Ctrl-C: Exit | Showing: all repos"
+fi
+
 echo "Fetching starred repositories..." >&2
 
-selected=$(fetch_repos | \
+selected=$(fetch_repos_names | \
   fzf --preview 'gh repo view {}' \
       --preview-window 'right:60%' \
       --header "$header" \

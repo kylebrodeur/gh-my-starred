@@ -1,6 +1,7 @@
 # gh-my-starred
 
 [![GitHub CLI](https://img.shields.io/badge/github--cli-extension-brightgreen?logo=github)](https://cli.github.com/)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
 
 A [GitHub CLI](https://cli.github.com/) extension to interactively browse your starred repositories.
 
@@ -13,29 +14,82 @@ gh extension install kylebrodeur/gh-my-starred
 ## Requirements
 
 - [GitHub CLI](https://cli.github.com/) (`gh`) - authenticated
-- [fzf](https://github.com/junegunn/fzf) - Fuzzy finder
+- [fzf](https://github.com/junegunn/fzf) - Only required for interactive mode
+- [jq](https://stedolan.github.io/jq/) - Recommended for JSON parsing
 
 ## Usage
 
 ```bash
-gh my-starred [limit]
+gh my-starred [options] [limit]
 ```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-h, --help` | Show help message |
+| `-v, --version` | Show version number |
+| `-j, --json` | Output as JSON array (pipeable, no interactive mode) |
+| `--ai` | Show AI assistant documentation |
 
 ### Arguments
 
 | Argument | Description |
 |----------|-------------|
-| `limit`  | Maximum number of repositories to fetch (default: all) |
+| `limit` | Maximum number of repositories to fetch (default: all) |
 
 ### Examples
 
 ```bash
-gh my-starred         # Browse all starred repos
-gh my-starred 100     # Browse last 100 starred repos
-gh my-starred --help  # Show help
+# Interactive mode
+gh my-starred              # Browse all starred repos
+gh my-starred 100          # Browse last 100 starred repos
+
+# JSON output mode (scriptable)
+gh my-starred --json       # Output full JSON of all starred repos
+gh my-starred --json 50    # Output JSON of last 50 starred repos
+
+# Documentation
+gh my-starred --ai         # Show AI assistant documentation
+gh my-starred --help       # Show usage help
 ```
 
-### Interactive Keys
+### JSON Schema
+
+When using `--json`, each repository object includes:
+
+```json
+{
+  "full_name": "owner/repo",
+  "description": "Repository description",
+  "stargazers_count": 123,
+  "language": "Python",
+  "html_url": "https://github.com/owner/repo",
+  "topics": ["cli", "automation"],
+  "updated_at": "2025-01-15T10:30:00Z",
+  ...
+}
+```
+
+### JSON Examples
+
+```bash
+# Filter repos by language
+gh my-starred --json | jq -r '.[] | select(.language == "Go") | .full_name'
+
+# Find repos by topic
+gh my-starred --json | jq -r '.[] | select(.topics | index("machine-learning")) | .full_name'
+
+# Get top 10 starred repos
+gh my-starred --json | jq 'sort_by(.stargazers_count) | reverse | .[:10]'
+
+# Export to CSV
+g my-starred --json | jq -r '.[] | [.full_name, .stargazers_count, .language] | @csv' > starred.csv
+```
+
+## Interactive Mode
+
+### Keys
 
 | Key | Action |
 |-----|--------|
@@ -43,13 +97,15 @@ gh my-starred --help  # Show help
 | `Enter` | Open selected repo in browser |
 | `Ctrl-C` | Exit |
 
-## Features
+## AI Assistant Support
 
-- 🔍 Fuzzy search through all your starred repos
-- 👁️ Live preview of repo details
-- ⌨️ Keyboard-driven navigation
-- 🌐 One-key open in browser
-- 🏷️ Optional limit for large star lists
+This extension includes built-in documentation for AI assistants. Run:
+
+```bash
+gh my-starred --ai
+```
+
+This prints guidance for AI agents on how to programatically interact with the extension.
 
 ## Updating
 
