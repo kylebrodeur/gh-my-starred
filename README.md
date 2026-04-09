@@ -8,12 +8,12 @@ A [GitHub CLI](https://cli.github.com/) extension to interactively browse your s
 
 ## Features
 
-- 🔍 **Fuzzy search** through all your starred repos with `fzf`
-- 📊 **JSON output** for scripting and analysis with `jq`
-- 💾 **Smart caching** for users with 1000+ stars (auto-detects updates)
-- 🤖 **PI extension** with native AI agent support (`starred_repos` tool)
-- 🌐 **One-key open** in browser
-- 🏷️ **Filter by** language, topic, or search query
+- **Fuzzy search** through all your starred repos with `fzf`
+- **JSON output** for scripting and analysis with `jq`
+- **Smart caching** for users with 1000+ stars (auto-detects updates)
+- **PI extension** with native AI agent support (`starred_repos` tool)
+- **One-key open** in browser
+- **Filter by** language, topic, or search query
 
 ## Table of Contents
 
