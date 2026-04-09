@@ -221,8 +221,8 @@ This prints guidance for AI agents on how to programatically interact with the e
 
 This extension is listed in multiple registries:
 
-- **GitHub CLI Extensions**: Search `gh extension search my-starred`
-- **agentskills.io Registry**: `npx skills search gh-my-starred`
+- **GitHub CLI Extensions**: `gh extension install kylebrodeur/gh-my-starred`
+- **agentskills.io**: `npx skills install kylebrodeur/gh-my-starred`
 - **Claude Code**: Auto-discovers `.claude/skills/gh-my-starred/SKILL.md`
 - **GitHub Copilot**: Auto-discovers `.github/skills/gh-my-starred/SKILL.md`
 - **PI Extensions**: Auto-discovers `.pi/extensions/gh-my-starred.ts`
@@ -232,9 +232,9 @@ This extension is listed in multiple registries:
 
 AI assistants can discover this tool via:
 
-1. **Skills registry** - `npx skills search starred` or `npx skills search gh-my-starred`
+1. **agentskills.io** - `npx skills install kylebrodeur/gh-my-starred`
 2. **SKILL.md (root)** - agentskills.io compatible format
-3. **Claude Code skill** - `.claude/skills/gh-my-starred/SKILL.md` with triggers
+3. **Claude Code skill** - `.claude/skills/gh-my-starred/SKILL.md`
 4. **GitHub Copilot skill** - `.github/skills/gh-my-starred/SKILL.md`
 5. **PI extension** - Provides `starred_repos` tool
 6. **GitHub CLI** - Can call `gh my-starred --json` for JSON output
