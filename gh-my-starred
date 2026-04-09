@@ -4,7 +4,7 @@ set -e
 # gh-my-starred: Interactive browser for your GitHub starred repositories
 # Usage: gh my-starred [options] [limit]
 
-VERSION="1.3.0"
+VERSION="0.1.0"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/gh-my-starred"
 CACHE_FILE="$CACHE_DIR/starred-repos.json"
 CACHE_TTL="${GH_STARRED_CACHE_TTL:-3600}"  # Default 1 hour in seconds

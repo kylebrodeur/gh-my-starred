@@ -1,7 +1,7 @@
 # gh-my-starred
 
 [![GitHub CLI](https://img.shields.io/badge/github--cli-extension-brightgreen?logo=github)](https://cli.github.com/)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
 
 A [GitHub CLI](https://cli.github.com/) extension to interactively browse your starred repositories.
 
