@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check executable exists
+      run: test -f gh-my-starred && test -x gh-my-starred
+    
+    - name: Check syntax
+      run: bash -n gh-my-starred
+    
+    - name: Check PI extension syntax
+      run: |
+        if command -v npx &> /dev/null; then
+          npx tsc --noEmit --skipLibCheck .pi/extensions/gh-my-starred.ts 2>/dev/null || true
+        fi

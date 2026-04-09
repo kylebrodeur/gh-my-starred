@@ -2,8 +2,31 @@
 
 [![GitHub CLI](https://img.shields.io/badge/github--cli-extension-brightgreen?logo=github)](https://cli.github.com/)
 [![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A [GitHub CLI](https://cli.github.com/) extension to interactively browse your starred repositories.
+
+## Features
+
+- 🔍 **Fuzzy search** through all your starred repos with `fzf`
+- 📊 **JSON output** for scripting and analysis with `jq`
+- 💾 **Smart caching** for users with 1000+ stars (auto-detects updates)
+- 🤖 **PI extension** with native AI agent support (`starred_repos` tool)
+- 🌐 **One-key open** in browser
+- 🏷️ **Filter by** language, topic, or search query
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Requirements](#requirements)
+- [Usage](#usage)
+- [Caching](#caching-for-1000-stars)
+- [PI Extension](#pi-extension)
+- [JSON Examples](#json-examples)
+- [Updating](#updating)
+- [Uninstall](#uninstall)
+- [License](#license)
 
 ## Installation
 
@@ -99,11 +122,31 @@ g my-starred --json | jq -r '.[] | [.full_name, .stargazers_count, .language] | 
 | `Enter` | Open selected repo in browser |
 | `Ctrl-C` | Exit |
 
+## Caching for 1000+ Stars
+
+With many starred repos, fetching can be slow. gh-my-starred automatically caches and smartly updates:
+
+| Feature | Description |
+|---------|-------------|
+| **Cache Location** | `~/.cache/gh-my-starred/starred-repos.json` (respects `XDG_CACHE_HOME`) |
+| **Smart Updates** | Compares `starred_at` timestamp - only fetches if new stars exist |
+| **Default TTL** | 1 hour (3600 seconds) |
+| **Custom TTL** | Set `GH_STARRED_CACHE_TTL` environment variable |
+
+```bash
+# Force cache refresh
+gh my-starred --refresh
+
+# Cache for 24 hours
+export GH_STARRED_CACHE_TTL=86400
+gh my-starred
+```
+
 ## PI Extension
 
-This repository also includes a **PI extension** that provides a native `starred_repos` tool for AI agents.
+This repository includes a native [PI](https://github.com/marioechler/pi) extension.
 
-### PI Extension Installation
+### Installation
 
 Copy or symlink the extension to your PI extensions directory:
 
