@@ -24,14 +24,38 @@ A [GitHub CLI](https://cli.github.com/) extension to interactively browse your s
 - [Caching](#caching-for-1000-stars)
 - [PI Extension](#pi-extension)
 - [JSON Examples](#json-examples)
+- [Discoverability](#discoverability)
 - [Updating](#updating)
 - [Uninstall](#uninstall)
 - [License](#license)
 
 ## Installation
 
+### Via GitHub CLI (gh)
+
 ```bash
 gh extension install kylebrodeur/gh-my-starred
+```
+
+### Via Skills CLI (npx skills / agentskills.io)
+
+```bash
+npx skills install kylebrodeur/gh-my-starred
+```
+
+This installs both the CLI extension and registers the skill for AI agents.
+
+### Manual Installation
+
+```bash
+# Clone
+git clone https://github.com/kylebrodeur/gh-my-starred.git
+
+# Make executable
+chmod +x gh-my-starred/gh-my-starred
+
+# Link to PATH or use directly
+ln -s "$PWD/gh-my-starred/gh-my-starred" ~/.local/bin/
 ```
 
 ## Requirements
@@ -193,16 +217,50 @@ gh my-starred --ai
 
 This prints guidance for AI agents on how to programatically interact with the extension.
 
+## Discoverability
+
+This extension is listed in multiple registries:
+
+- **GitHub CLI Extensions**: Search `gh extension search my-starred`
+- **agentskills.io**: Listed as `gh-my-starred` skill
+- **PI Extensions**: Auto-discovered in `.pi/extensions/`
+- **GitHub Topics**: `gh-extension`, `github-cli`, `fzf`, `starred-repositories`
+
+### For AI Agents
+
+AI assistants can discover this tool via:
+
+1. **Skills registry** - `npx skills search starred` or `npx skills search gh-my-starred`
+2. **SKILL.md** - This repo includes a `SKILL.md` file in agentskills.io format
+3. **PI native tool** - When installed as PI extension, provides `starred_repos` tool
+4. **GitHub CLI** - Can call `gh my-starred --json` for JSON output
+
+### Related Projects
+
+- [fzf](https://github.com/junegunn/fzf) - Fuzzy finder used for interactive mode
+- [gh](https://cli.github.com/) - GitHub CLI this extension is built for
+- [PI](https://github.com/marioechler/pi) - AI agent harness with native extension support
+
 ## Updating
 
 ```bash
 gh extension upgrade kylebrodeur/gh-my-starred
 ```
 
+Or via skills:
+```bash
+npx skills update kylebrodeur/gh-my-starred
+```
+
 ## Uninstall
 
 ```bash
 gh extension remove kylebrodeur/gh-my-starred
+```
+
+To also remove the skill registration:
+```bash
+npx skills remove kylebrodeur/gh-my-starred
 ```
 
 ## License

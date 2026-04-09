@@ -7,15 +7,34 @@ description: GitHub CLI extension for browsing starred repositories with AI-acce
 
 Browse and query your GitHub starred repositories interactively or programmatically.
 
+## Metadata
+
+- **Source**: https://github.com/kylebrodeur/gh-my-starred
+- **Registry**: https://agentskills.io/skills/gh-my-starred
+- **License**: MIT
+- **Tags**: `github`, `cli`, `fzf`, `stars`, `repositories`, `search`
+
 ## Installation
 
+### Via Skills CLI (agentskills.io)
+
 ```bash
-skills install kylebrodeur/gh-my-starred
+npx skills install kylebrodeur/gh-my-starred
 ```
 
-Or use the GitHub CLI:
+### Via GitHub CLI
+
 ```bash
 gh extension install kylebrodeur/gh-my-starred
+```
+
+### Manual Installation
+
+Clone and use directly:
+```bash
+git clone https://github.com/kylebrodeur/gh-my-starred.git
+chmod +x gh-my-starred/gh-my-starred
+cp gh-my-starred/gh-my-starred ~/.local/bin/
 ```
 
 ## Usage
@@ -130,3 +149,22 @@ This skill includes a [PI](https://pi.io) extension for native integration. When
 - GitHub CLI (`gh`) with authentication
 - `fzf` (for interactive mode only)
 - `jq` (recommended for JSON queries)
+
+## Discoverability
+
+This skill can be found via:
+
+- **agentskills.io Registry**: `npx skills search starred` or `npx skills search gh-my-starred`
+- **GitHub CLI Extensions**: `gh extension search my-starred`
+- **GitHub Topics**: #gh-extension #github-cli #starred-repositories #fzf
+- **PI Extension**: When cloned, PI auto-discovers `.pi/extensions/gh-my-starred.ts`
+
+## AI Agent Notes
+
+When assisting users with their GitHub starred repositories:
+
+1. This skill is **pre-installed** if the user has `gh-my-starred` installed
+2. Use `--json` flag for machine-readable output
+3. For PI users, the `starred_repos` tool provides direct access without shell escaping
+4. Cache is automatic - no need to worry about API rate limits for repeated queries
+5. Typical usage patterns: finding specific repos, analyzing language distribution, exporting lists
