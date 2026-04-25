@@ -33,19 +33,48 @@ A [GitHub CLI](https://cli.github.com/) extension to interactively browse your s
 
 ## Installation
 
-### Via GitHub CLI (gh)
+gh-my-starred provides two interfaces: a **command-line tool** for your terminal and a **PI extension** for AI agents. You can install either or both depending on your needs.
+
+### Quick Start (Recommended)
+
+Install both the CLI and PI extension for the full experience:
+
+```bash
+# 1. Install the GitHub CLI extension (provides `gh my-starred` command)
+gh extension install kylebrodeur/gh-my-starred
+
+# 2. Install the PI package (provides `starred_repos`, `list_star_lists` tools to AI agents)
+pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
+```
+
+### What's What
+
+| Component | Provided By | What It Does |
+|-----------|------------|--------------|
+| `gh my-starred` | `gh extension install ...` | Terminal CLI, JSON output, fzf browser |
+| `starred_repos` tool | `pi install ...` | AI agent queries your starred repos |
+| `list_star_lists` tool | `pi install ...` | AI agent discovers your star lists |
+| `/starred` command | `pi install ...` | Launches fzf from within PI (requires CLI) |
+
+**Note:** The `/starred` command in PI shells out to `gh my-starred` for the fzf interface. If you only install the PI package without the CLI, the PI **tools** (`starred_repos`, `list_star_lists`, `get_list_repos`, `compare_lists`) work fine. Only the `/starred` interactive command needs both installed.
+
+### Via GitHub CLI Only (Command Line Only)
+
+If you just want the terminal CLI:
 
 ```bash
 gh extension install kylebrodeur/gh-my-starred
 ```
 
-### Via Skills CLI (npx skills)
+### Via PI Only (AI Agent Only)
+
+If you only want the PI tools (no terminal CLI):
 
 ```bash
-npx skills install kylebrodeur/gh-my-starred
+pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
 ```
 
-This installs the skill to the appropriate location for your AI agent (Claude Code, Copilot, PI, etc.) based on the agentskills.io standard.
+The PI tools (`starred_repos`, `list_star_lists`, etc.) work independently — they call the GitHub API directly, not the CLI.
 
 ### Manual Installation
 
@@ -204,23 +233,38 @@ gh my-starred --list "Favorites" --list-refresh --json
 
 ## PI Extension
 
-This repository includes a native [PI](https://github.com/marioechler/pi) extension.
+This repository includes a native [PI](https://github.com/marioechler/pi) extension with 4 tools and a command.
 
 ### Installation
 
-Copy or symlink the extension to your PI extensions directory:
+The recommended way is to install it as a PI **package** (handles extensions + skills automatically):
 
 ```bash
-# Global installation (recommended)
-mkdir -p ~/.pi/agent/extensions/
-cp .pi/extensions/gh-my-starred.ts ~/.pi/agent/extensions/
-
-# Or project-local
-mkdir -p .pi/extensions/
-ln -s .pi/extensions/gh-my-starred.ts ../.pi/extensions/
+pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
 ```
 
 Then reload PI with `/reload`.
+
+### Manual Installation (Advanced)
+
+You can also copy the extension file directly, but you won't get updates automatically:
+
+```bash
+mkdir -p ~/.pi/agent/extensions/
+cp .pi/extensions/gh-my-starred.ts ~/.pi/agent/extensions/
+```
+
+### Dual-Install Requirement for `/starred`
+
+The PI tools (`starred_repos`, `list_star_lists`, `get_list_repos`, `compare_lists`) work **standalone** — they call the GitHub API directly via `gh api`.
+
+However, the `/starred` command is an **interactive fzf launcher** that shells out to `gh my-starred`. If you run `/starred` without the CLI extension installed, you'll see a message telling you to run:
+
+```bash
+gh extension install kylebrodeur/gh-my-starred
+```
+
+**Summary:** Install the CLI for the terminal, install the PI package for AI tools, or install both for everything.
 
 ### PI Tools
 

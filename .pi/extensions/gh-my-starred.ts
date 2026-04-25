@@ -554,6 +554,16 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
   pi.registerCommand("starred", {
     description: "Browse starred repositories with fzf",
     handler: async (args: string, ctx: ExtensionContext) => {
+      // Check if gh-my-starred CLI is available
+      const ghExtCheck = await pi.exec("gh", ["my-starred", "--version"], { timeout: 5000 });
+      if (ghExtCheck.code !== 0) {
+        ctx.ui.notify(
+          "gh-my-starred CLI not found. Install it: gh extension install kylebrodeur/gh-my-starred",
+          "error"
+        );
+        return;
+      }
+
       // Parse subcommand: /starred list "name" for list browsing
       const trimmed = args.trim();
       if (trimmed.startsWith("list ") || trimmed.startsWith("list\t")) {

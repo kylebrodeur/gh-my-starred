@@ -22,10 +22,29 @@ Browse and query your GitHub starred repositories interactively or programmatica
 npx skills install kylebrodeur/gh-my-starred
 ```
 
-### Via GitHub CLI
+### Via GitHub CLI (for terminal use)
 
 ```bash
 gh extension install kylebrodeur/gh-my-starred
+```
+
+This provides the `gh my-starred` command in your terminal.
+
+### Via PI (for AI agent tools)
+
+```bash
+pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
+```
+
+This provides AI tools (`starred_repos`, `list_star_lists`, etc.) that AI agents can use.
+
+### Both (Recommended)
+
+For the full experience (terminal CLI + AI tools + interactive `/starred` command):
+
+```bash
+gh extension install kylebrodeur/gh-my-starred
+pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
 ```
 
 ### Manual Installation
