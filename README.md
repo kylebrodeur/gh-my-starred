@@ -11,7 +11,8 @@ A [GitHub CLI](https://cli.github.com/) extension to interactively browse your s
 - **Fuzzy search** through all your starred repos with `fzf`
 - **JSON output** for scripting and analysis with `jq`
 - **Smart caching** for users with 1000+ stars (auto-detects updates)
-- **PI extension** with native AI agent support (`starred_repos` tool)
+- **Star lists** support — browse curated lists with preserved ordering
+- **PI extension** with native AI agent support (`starred_repos`, `list_star_lists`, `get_list_repos` tools)
 - **One-key open** in browser
 - **Filter by** language, topic, or search query
 
@@ -22,6 +23,7 @@ A [GitHub CLI](https://cli.github.com/) extension to interactively browse your s
 - [Requirements](#requirements)
 - [Usage](#usage)
 - [Caching](#caching-for-1000-stars)
+- [Star Lists](#star-lists)
 - [PI Extension](#pi-extension)
 - [JSON Examples](#json-examples)
 - [Discoverability](#discoverability)
@@ -80,6 +82,9 @@ gh my-starred [options] [limit]
 | `--ai` | Show AI assistant documentation |
 | `--cache` | Force use cached data |
 | `--refresh` | Force refresh cache |
+| `--lists` | Show all star lists |
+| `--list NAME` | Browse a specific star list (preserves order) |
+| `--list-refresh` | Force refresh list cache |
 
 ### Arguments
 
@@ -134,6 +139,11 @@ gh my-starred --json | jq 'sort_by(.stargazers_count) | reverse | .[:10]'
 
 # Export to CSV
 g my-starred --json | jq -r '.[] | [.full_name, .stargazers_count, .language] | @csv' > starred.csv
+
+# Star lists
+gh my-starred --lists                    # Show all star lists
+gh my-starred --list "Favorites"        # Browse a list interactively
+gh my-starred --list "Favorites" --json # Output list as JSON
 ```
 
 ## Interactive Mode
@@ -166,6 +176,32 @@ export GH_STARRED_CACHE_TTL=86400
 gh my-starred
 ```
 
+## Star Lists
+
+GitHub Star Lists allow you to organize starred repos into curated collections. Since GitHub's API does not expose list ordering, gh-my-starred uses HTML scraping to preserve the order in which repos were added to each list.
+
+### Discover lists
+
+```bash
+gh my-starred --lists
+```
+
+### Browse a specific list (ordered)
+
+```bash
+gh my-starred --list "Favorites"
+gh my-starred --list "Research" --json
+gh my-starred --list "Research" --json 20
+```
+
+### List caching
+
+List contents are cached separately at `~/.cache/gh-my-starred/lists/`. Use `--list-refresh` to force a refresh:
+
+```bash
+gh my-starred --list "Favorites" --list-refresh --json
+```
+
 ## PI Extension
 
 This repository includes a native [PI](https://github.com/marioechler/pi) extension.
@@ -186,9 +222,18 @@ ln -s .pi/extensions/gh-my-starred.ts ../.pi/extensions/
 
 Then reload PI with `/reload`.
 
-### PI Tool: `starred_repos`
+### PI Tools
 
-Once installed, AI agents in PI can use the `starred_repos` tool:
+Once installed, AI agents in PI can use these tools:
+
+| Tool | Description |
+|------|-------------|
+| `starred_repos` | Query and filter all starred repositories |
+| `list_star_lists` | Discover all star lists for the user |
+| `get_list_repos` | Get ordered repos from a specific star list |
+| `compare_lists` | Compare two star lists (shared, unique) |
+
+#### `starred_repos` Parameters
 
 | Parameter | Description |
 |-----------|-------------|
@@ -197,7 +242,30 @@ Once installed, AI agents in PI can use the `starred_repos` tool:
 | `topic` | Filter by topic tag |
 | `search` | Fuzzy search in name/description |
 | `minStars` | Minimum stargazer count |
-| `sortBy` | Sort by: `stars`, `updated`, or `name` |
+| `sortBy` | Sort by: `stars`, `updated`, `name`, or `starred_at` |
+| `refresh` | Force refresh cache before querying |
+
+#### `get_list_repos` Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `listName` | Name of the star list (required) |
+| `limit` | Max repos to return |
+| `refresh` | Force refresh list cache |
+| `language` | Filter by programming language |
+| `topic` | Filter by topic tag |
+| `search` | Search in name or description |
+| `minStars` | Minimum stargazer count |
+| `enrich` | Enrich with full metadata from starred cache (default: true) |
+
+### PI Command: `/starred`
+
+Open the interactive fzf browser from within PI:
+```
+/starred           # Browse starred repos
+/starred 50        # Limit to 50 repos
+/starred list "Favorites"  # Browse a specific list
+```
 
 ### PI Command: `/starred`
 

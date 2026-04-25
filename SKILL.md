@@ -46,6 +46,15 @@ gh my-starred
 gh my-starred 100  # limit to 100 most recent
 ```
 
+### Star Lists
+Discover and browse curated star lists (preserves ordering):
+```bash
+gh my-starred --lists                       # Show all lists
+gh my-starred --list "Favorites"            # Browse a list
+gh my-starred --list "Research" --json      # Export list as JSON
+gh my-starred --list "Research" --json 20   # Limit to 20
+```
+
 ### JSON Mode (Programmatic Access)
 Get structured JSON data for all starred repos:
 ```bash
@@ -106,6 +115,9 @@ gh my-starred --json | jq '.[] | select(.stargazers_count < 100) | ["⭐" + (.st
 | Flag | Description |
 |------|-------------|
 | `--json` | Output JSON array instead of interactive mode |
+| `--lists` | Show all star lists |
+| `--list NAME` | Browse a specific star list |
+| `--list-refresh` | Force refresh list cache |
 | `--ai` | Show AI documentation |
 | `--help` | Show usage help |
 | `--version` | Show version |
@@ -125,9 +137,18 @@ gh my-starred --json | jq -r '.[].language // "null"' | sort | uniq -c | sort -r
 
 ## PI Extension
 
-This skill includes a [PI](https://pi.io) extension for native integration. When PI loads the skill, it registers a `starred_repos` tool that AI agents can use directly.
+This skill includes a [PI](https://pi.io) extension for native integration. When PI loads the skill, it registers these tools:
 
-### PI Tool Parameters
+### PI Tools
+
+| Tool | Description |
+|------|-------------|
+| `starred_repos` | Query and filter all starred repositories |
+| `list_star_lists` | Discover all star lists |
+| `get_list_repos` | Get ordered repos from a specific list |
+| `compare_lists` | Compare two star lists |
+
+### PI Tool Parameters: `starred_repos`
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -136,12 +157,28 @@ This skill includes a [PI](https://pi.io) extension for native integration. When
 | `topic` | string | Filter by topic tag |
 | `search` | string | Search in name/description |
 | `minStars` | number | Minimum star count |
-| `sortBy` | string | Sort field: `stars`, `updated`, or `name` |
+| `sortBy` | string | Sort field: `stars`, `updated`, `name`, `starred_at` |
+| `refresh` | boolean | Force refresh cache |
+
+### PI Tool Parameters: `get_list_repos`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `listName` | string | Name of the star list (required) |
+| `limit` | number | Maximum repos to return |
+| `refresh` | boolean | Force refresh list cache |
+| `language` | string | Filter by programming language |
+| `topic` | string | Filter by topic tag |
+| `search` | string | Search in name/description |
+| `minStars` | number | Minimum star count |
+| `enrich` | boolean | Enrich with starred cache metadata (default: true) |
 
 ### PI Command
 
 ```
-/starred [limit]  # Launch interactive fzf browser
+/starred                    # Launch interactive fzf browser
+/starred 50                 # Limit to 50 repos
+/starred list "Favorites"   # Browse a specific list
 ```
 
 ## Requirements

@@ -1,0 +1,36 @@
+{
+  "name": "gh-my-starred",
+  "version": "0.2.0",
+  "description": "GitHub CLI extension + PI extension for browsing starred repositories and star lists",
+  "author": "kylebrodeur",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kylebrodeur/gh-my-starred.git"
+  },
+  "keywords": [
+    "github-cli",
+    "gh-extension",
+    "starred-repositories",
+    "fzf",
+    "pi-extension",
+    "pi-package"
+  ],
+  "main": "src/cli.js",
+  "bin": {
+    "gh-my-starred": "src/cli.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "pi": {
+    "extensions": [".pi/extensions/gh-my-starred.ts"]
+  },
+  "scripts": {
+    "test": "bash test/run.sh && node test/lib.test.js",
+    "test:unit": "node test/lib.test.js",
+    "test:integration": "bash test/run.sh",
+    "lint": "bash -n gh-my-starred",
+    "cli": "node src/cli.js"
+  }
+}
