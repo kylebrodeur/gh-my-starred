@@ -1,0 +1,35 @@
+# Exclude files not needed for the PI npm package
+# The gh CLI extension files are not needed in the npm tarball
+
+# Cache / test output
+.cache/
+*.cache.json
+test-output/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Node modules
+node_modules/
+
+# The gh CLI wrapper is not needed for PI
+gh-my-starred
+
+# CLI source is not needed for PI (PI extension is self-contained)
+src/
+
+# Test files — not needed at runtime
+test/
+
+# Docs that are in-repo only
+REVIEW.md
+CONTRIBUTING.md

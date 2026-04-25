@@ -33,6 +33,12 @@ This provides the `gh my-starred` command in your terminal.
 ### Via PI (for AI agent tools)
 
 ```bash
+pi install npm:pi-gh-my-starred
+```
+
+Or via git:
+
+```bash
 pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
 ```
 

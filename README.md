@@ -1,7 +1,7 @@
 # gh-my-starred
 
 [![GitHub CLI](https://img.shields.io/badge/github--cli-extension-brightgreen?logo=github)](https://cli.github.com/)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A [GitHub CLI](https://cli.github.com/) extension to interactively browse your starred repositories.
@@ -44,7 +44,9 @@ Install both the CLI and PI extension for the full experience:
 gh extension install kylebrodeur/gh-my-starred
 
 # 2. Install the PI package (provides `starred_repos`, `list_star_lists` tools to AI agents)
-pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
+pi install npm:pi-gh-my-starred
+# or via git:
+# pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
 ```
 
 ### What's What
@@ -69,6 +71,12 @@ gh extension install kylebrodeur/gh-my-starred
 ### Via PI Only (AI Agent Only)
 
 If you only want the PI tools (no terminal CLI):
+
+```bash
+pi install npm:pi-gh-my-starred
+```
+
+Or via git:
 
 ```bash
 pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
@@ -238,6 +246,12 @@ This repository includes a native [PI](https://github.com/marioechler/pi) extens
 ### Installation
 
 The recommended way is to install it as a PI **package** (handles extensions + skills automatically):
+
+```bash
+pi install npm:pi-gh-my-starred
+```
+
+Or via git:
 
 ```bash
 pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0

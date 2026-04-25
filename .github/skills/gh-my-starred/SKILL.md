@@ -15,6 +15,11 @@ gh extension install kylebrodeur/gh-my-starred
 
 ### PI Package
 ```bash
+pi install npm:pi-gh-my-starred
+```
+
+Or via git:
+```bash
 pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
 ```
 
