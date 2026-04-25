@@ -1,7 +1,9 @@
 # gh-my-starred
 
 [![GitHub CLI](https://img.shields.io/badge/github--cli-extension-brightgreen?logo=github)](https://cli.github.com/)
-[![Version](https://img.shields.io/badge/version-0.2.0-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
+-[![Version](https://img.shields.io/badge/version-0.2.2-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
++[![Version](https://img.shields.io/badge/version-0.2.1-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
++[![npm](https://img.shields.io/npm/v/pi-gh-my-starred)](https://www.npmjs.com/package/pi-gh-my-starred)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A [GitHub CLI](https://cli.github.com/) extension to interactively browse your starred repositories.
@@ -33,32 +35,29 @@ A [GitHub CLI](https://cli.github.com/) extension to interactively browse your s
 
 ## Installation
 
-gh-my-starred provides two interfaces: a **command-line tool** for your terminal and a **PI extension** for AI agents. You can install either or both depending on your needs.
+## Quick Install
 
-### Quick Start (Recommended)
-
-Install both the CLI and PI extension for the full experience:
+### Both (Recommended)
 
 ```bash
-# 1. Install the GitHub CLI extension (provides `gh my-starred` command)
+# Terminal CLI
 gh extension install kylebrodeur/gh-my-starred
 
-# 2. Install the PI package (provides `starred_repos`, `list_star_lists` tools to AI agents)
+# PI package (AI tools)
 pi install npm:pi-gh-my-starred
-# or via git:
-# pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
+/reload
 ```
 
 ### What's What
 
-| Component | Provided By | What It Does |
-|-----------|------------|--------------|
+| Component | Install Command | What It Does |
+|-----------|----------------|--------------|
 | `gh my-starred` | `gh extension install ...` | Terminal CLI, JSON output, fzf browser |
-| `starred_repos` tool | `pi install ...` | AI agent queries your starred repos |
-| `list_star_lists` tool | `pi install ...` | AI agent discovers your star lists |
-| `/starred` command | `pi install ...` | Launches fzf from within PI (requires CLI) |
+| `starred_repos` | `pi install npm:pi-gh-my-starred` | AI tool: query your starred repos |
+| `list_star_lists` | `pi install npm:pi-gh-my-starred` | AI tool: discover your star lists |
+| `/starred` | `pi install npm:pi-gh-my-starred` | Interactive fzf in PI (needs CLI above) |
 
-**Note:** The `/starred` command in PI shells out to `gh my-starred` for the fzf interface. If you only install the PI package without the CLI, the PI **tools** (`starred_repos`, `list_star_lists`, `get_list_repos`, `compare_lists`) work fine. Only the `/starred` interactive command needs both installed.
+**Note:** PI tools work standalone. The `/starred` command needs both because it calls `gh my-starred`.
 
 ### Via GitHub CLI Only (Command Line Only)
 
@@ -68,21 +67,21 @@ If you just want the terminal CLI:
 gh extension install kylebrodeur/gh-my-starred
 ```
 
-### Via PI Only (AI Agent Only)
-
-If you only want the PI tools (no terminal CLI):
+### Via PI Only (No CLI)
 
 ```bash
 pi install npm:pi-gh-my-starred
 ```
 
-Or via git:
+For specific versions:
 
 ```bash
-pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
-```
+# Specific npm version
+pi install npm:pi-gh-my-starred@0.2.1
 
-The PI tools (`starred_repos`, `list_star_lists`, etc.) work independently — they call the GitHub API directly, not the CLI.
+# Specific git tag
+pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.1
+```
 
 ### Manual Installation
 
@@ -254,7 +253,7 @@ pi install npm:pi-gh-my-starred
 Or via git:
 
 ```bash
-pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.0
+pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.2
 ```
 
 Then reload PI with `/reload`.
@@ -325,14 +324,6 @@ Open the interactive fzf browser from within PI:
 /starred list "Favorites"  # Browse a specific list
 ```
 
-### PI Command: `/starred`
-
-Open the interactive fzf browser from within PI:
-```
-/starred      # Browse starred repos
-/starred 50   # Limit to 50 repos
-```
-
 ## AI Assistant Support
 
 This extension includes built-in documentation for AI assistants. Run:
@@ -373,24 +364,52 @@ AI assistants can discover this tool via:
 
 ## Updating
 
+### GitHub CLI Extension
+
 ```bash
 gh extension upgrade kylebrodeur/gh-my-starred
 ```
 
-Or via skills:
+### PI Package
+
 ```bash
-npx skills update kylebrodeur/gh-my-starred
+pi update
+```
+
+Or update just this package:
+
+```bash
+pi remove npm:pi-gh-my-starred
+pi install npm:pi-gh-my-starred
+/reload
+```
+
+### Both
+
+```bash
+gh extension upgrade kylebrodeur/gh-my-starred
+pi update
+/reload
 ```
 
 ## Uninstall
+
+### GitHub CLI Extension
 
 ```bash
 gh extension remove kylebrodeur/gh-my-starred
 ```
 
-To also remove the skill registration:
+### PI Package
+
 ```bash
-npx skills remove kylebrodeur/gh-my-starred
+pi remove npm:pi-gh-my-starred
+```
+
+Or if installed via git:
+
+```bash
+pi remove git:github.com/kylebrodeur/gh-my-starred
 ```
 
 ## License
