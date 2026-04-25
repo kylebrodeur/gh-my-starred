@@ -27,8 +27,8 @@
     "extensions": [".pi/extensions/gh-my-starred.ts"]
   },
   "scripts": {
-    "test": "bash test/run.sh && node test/lib.test.js",
-    "test:unit": "node test/lib.test.js",
+    "test": "bash test/run.sh \u0026\u0026 node test/lib.test.js \u0026\u0026 node test/edge-cases.test.js",
+    "test:unit": "node test/lib.test.js \u0026\u0026 node test/edge-cases.test.js",
     "test:integration": "bash test/run.sh",
     "lint": "bash -n gh-my-starred",
     "cli": "node src/cli.js"

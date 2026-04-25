@@ -227,27 +227,32 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function fetchListReposOrdered(listName) {
+async function fetchListReposOrdered(listName, options = {}) {
   const user = getGitHubUser();
   if (!user) throw new Error("Could not determine GitHub username");
 
   const slug = slugify(listName);
   const seen = new Set();
   const ordered = [];
+  const maxPages = options.maxPages || 20;
 
-  for (let page = 1; page <= 20; page++) {
+  for (let page = 1; page <= maxPages; page++) {
     const url = `https://github.com/stars/${user}/lists/${slug}?page=${page}`;
-    const result = execCurl(url, { timeout: 30000 });
+    const result = execCurl(url, { timeout: 30, retries: 2 });
 
-    if (result.code !== 0) break;
+    if (result.code !== 0) {
+      if (page === 1 && result.stderr?.includes("404")) {
+        throw new Error(`List '${listName}' not found. Check the list exists at https://github.com/stars/${user}/lists`);
+      }
+      break;
+    }
 
     const html = result.stdout;
     let foundOnPage = false;
-    const regex = /href="\/([^\/"]+\/[^\/"]+)"/g;
+    const regex = /href="\/([^/"]+\/[^/"]+)"/g;
     let m;
     while ((m = regex.exec(html)) !== null) {
       const fullName = m[1];
-      // Skip non-repo patterns
       if (/\?|stargazers|forks|login|signup|features\/|security\/|settings\//.test(fullName)) continue;
       if (!fullName.includes("/")) continue;
       if (seen.has(fullName)) continue;
@@ -257,7 +262,7 @@ async function fetchListReposOrdered(listName) {
     }
 
     if (!foundOnPage) break;
-    if (page < 20) await sleep(DELAY_MS);
+    if (page < maxPages) await sleep(DELAY_MS);
   }
 
   return ordered;

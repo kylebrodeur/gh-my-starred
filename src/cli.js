@@ -50,6 +50,7 @@ ARGS
 
 ENVIRONMENT
   GH_STARRED_CACHE_TTL   Cache time-to-live in seconds (default: 3600)
+  GH_STARRED_TIMEOUT     API request timeout in ms (default: 120000)
 
 INTERACTIVE KEYS
   ↑/↓      Navigate
@@ -84,9 +85,8 @@ Full documentation: https://github.com/kylebrodeur/gh-my-starred/blob/main/SKILL
 }
 
 function checkGhAuth() {
-  try {
-    require("child_process").execSync("gh auth status", { stdio: "pipe" });
-  } catch {
+  const result = execGh(["api", "user", "--jq", ".login"], { timeout: 10000 });
+  if (result.code !== 0) {
     console.error("Error: Not authenticated with GitHub CLI. Run: gh auth login");
     process.exit(1);
   }
@@ -125,10 +125,14 @@ async function runInteractive(repos, header, prompt) {
 
     let selected = "";
     fzf.stdout.on("data", data => { selected += data; });
-    fzf.on("close", () => {
+    fzf.on("close", (code) => {
       selected = selected.trim();
-      if (selected) {
-        require("child_process").spawnSync("gh", ["repo", "view", selected, "--web"], { stdio: "inherit" });
+      if (selected && code === 0) {
+        try {
+          require("child_process").spawnSync("gh", ["repo", "view", selected, "--web"], { stdio: "inherit" });
+        } catch {
+          console.error(`Could not open ${selected} in browser.`);
+        }
       }
       resolve();
     });
