@@ -1,8 +1,8 @@
 # gh-my-starred
 
 [![GitHub CLI](https://img.shields.io/badge/github--cli-extension-brightgreen?logo=github)](https://cli.github.com/)
--[![Version](https://img.shields.io/badge/version-0.2.2-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
-+[![Version](https://img.shields.io/badge/version-0.2.1-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
+-[![Version](https://img.shields.io/badge/version-0.2.3-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
++[![Version](https://img.shields.io/badge/version-0.2.3-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
 +[![npm](https://img.shields.io/npm/v/pi-gh-my-starred)](https://www.npmjs.com/package/pi-gh-my-starred)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -80,7 +80,7 @@ For specific versions:
 pi install npm:pi-gh-my-starred@0.2.1
 
 # Specific git tag
-pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.1
+pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.3
 ```
 
 ### Manual Installation
@@ -253,7 +253,7 @@ pi install npm:pi-gh-my-starred
 Or via git:
 
 ```bash
-pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.2
+pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.3
 ```
 
 Then reload PI with `/reload`.

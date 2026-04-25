@@ -24,7 +24,7 @@ const {
   slugify
 } = require("./lib");
 
-const VERSION = "0.2.2";
+const VERSION = "0.2.3";
 
 function showHelp() {
   console.log(`gh my-starred - Browse your starred GitHub repositories interactively

@@ -66,7 +66,7 @@ async function loadCachedRepos(): Promise<StarredRepo[] | null> {
   try {
     const data = await readFile(STARRED_CACHE, "utf-8");
     return JSON.parse(data) as StarredRepo[];
-  } catch {
+  } catch (_e) {
     return null;
   }
 }
@@ -80,7 +80,7 @@ async function loadListCache(listName: string): Promise<ListCacheEntry | null> {
   try {
     const data = await readFile(join(LISTS_DIR, `${listName}.json`), "utf-8");
     return JSON.parse(data) as ListCacheEntry;
-  } catch {
+  } catch (_e) {
     return null;
   }
 }
@@ -325,7 +325,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
         } catch (e) {
           return {
             isError: true,
-            content: [{ type: "text", text: `Error fetching starred repos: ${e instanceof Error ? e.message : String(e)}` }]
+            content: [{ type: "text", text: "Error fetching starred repos: " + (e instanceof Error ? e.message : String(e)) }]
           };
         }
       }
@@ -377,7 +377,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       } catch (e) {
         return {
           isError: true,
-          content: [{ type: "text", text: `Error discovering lists: ${e instanceof Error ? e.message : String(e)}` }]
+          content: [{ type: "text", text: "Error discovering lists: " + (e instanceof Error ? e.message : String(e)) }]
         };
       }
     }
@@ -429,7 +429,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
         } catch (e) {
           return {
             isError: true,
-            content: [{ type: "text", text: `Error fetching list "${listName}": ${e instanceof Error ? e.message : String(e)}` }]
+            content: [{ type: "text", text: "Error fetching list \"" + listName + "\": " + (e instanceof Error ? e.message : String(e)) }]
           };
         }
       }
@@ -543,7 +543,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       } catch (e) {
         return {
           isError: true,
-          content: [{ type: "text", text: `Error comparing lists: ${e instanceof Error ? e.message : String(e)}` }]
+          content: [{ type: "text", text: "Error comparing lists: " + (e instanceof Error ? e.message : String(e)) }]
         };
       }
     }
@@ -581,14 +581,14 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
           }
           const tmp = join(CACHE_DIR, `.list-${listName}.tmp`);
           await writeFile(tmp, ordered.join("\n"));
-          await pi.exec("fzf", ["--preview", "gh repo view {}", "--preview-window", "right:60%:wrap", "--prompt", `List: ${listName}> "], {
+          await pi.exec("fzf", ["--preview", "gh repo view {}", "--preview-window", "right:60%:wrap", "--prompt", "List: " + listName + "> "], {
             timeout: 0,
             cwd: CACHE_DIR
           });
           // Cleanup
-          try { await pi.exec("rm", [tmp]); } catch { /* ignore */ }
+          try { await pi.exec("rm", [tmp]); } catch (_) { /* ignore */ }
         } catch (e) {
-          ctx.ui.notify(`Failed to browse list: ${e instanceof Error ? e.message : String(e)}`, "error");
+          ctx.ui.notify("Failed to browse list: " + (e1 instanceof Error ? e1.message : String(e1)), "error");
         }
         return;
       }
@@ -602,7 +602,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
           ctx.ui.notify("Failed to launch interactive browser. Is fzf installed?", "error");
         }
       } catch (e) {
-        ctx.ui.notify(`Error: ${e instanceof Error ? e.message : String(e)}`, "error");
+        ctx.ui.notify("Error: " + (e instanceof Error ? e.message : String(e)), "error");
       }
     }
   });
