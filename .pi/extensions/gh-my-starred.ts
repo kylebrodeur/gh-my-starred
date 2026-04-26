@@ -104,7 +104,12 @@ async function fetchStarredRepos(pi: ExtensionAPI, signal?: AbortSignal, limit =
     throw new Error(result.stderr || "Failed to fetch starred repos");
   }
 
-  const repos = JSON.parse(result.stdout) as StarredRepo[];
+  // Handle concatenated JSON arrays from gh api --paginate
+  const normalizedJson = result.stdout.trim()
+    .replace(/\]\s*\[/g, ',')  // join adjacent arrays separated by whitespace/newlines
+    .replace(/\]\n\[/g, ',');  // join newline-separated arrays (just in case)
+
+  const repos = JSON.parse(normalizedJson) as StarredRepo[];
   return repos.slice(0, limit);
 }
 
@@ -306,14 +311,14 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       const limit = Math.min(params.limit ?? 100, 500);
       const { language, topic, search, minStars, sortBy, refresh } = params;
 
-      onUpdate?.({ content: [{ type: "text", text: refresh ? "Refreshing starred repositories cache..." : "Loading starred repositories..." }] });
+      onUpdate?.({ content: [{ type: "text", text: refresh ? "Refreshing starred repositories cache..." : "Loading starred repositories..." }], details: {} });
 
       let repos: StarredRepo[] | null = null;
 
       if (!refresh) {
         repos = await loadCachedRepos();
         if (repos) {
-          onUpdate?.({ content: [{ type: "text", text: `Using cached data (${repos.length} repos)` }] });
+          onUpdate?.({ content: [{ type: "text", text: `Using cached data (${repos.length} repos)` }], details: {} });
         }
       }
 
@@ -321,11 +326,12 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
         try {
           repos = await fetchStarredRepos(pi, signal, limit);
           await saveCachedRepos(repos);
-          onUpdate?.({ content: [{ type: "text", text: `Fetched ${repos.length} repos from GitHub API` }] });
+          onUpdate?.({ content: [{ type: "text", text: `Fetched ${repos.length} repos from GitHub API` }], details: {} });
         } catch (e) {
           return {
             isError: true,
-            content: [{ type: "text", text: "Error fetching starred repos: " + (e instanceof Error ? e.message : String(e)) }]
+            content: [{ type: "text", text: "Error fetching starred repos: " + (e instanceof Error ? e.message : String(e)) }],
+            details: {}
           };
         }
       }
@@ -356,7 +362,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
     }),
 
     async execute(_toolCallId, params, signal, onUpdate) {
-      onUpdate?.({ content: [{ type: "text", text: "Discovering star lists..." }] });
+      onUpdate?.({ content: [{ type: "text", text: "Discovering star lists..." }], details: {} });
 
       try {
         const lists = await fetchStarLists(pi, signal);
@@ -377,8 +383,9 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       } catch (e) {
         return {
           isError: true,
-          content: [{ type: "text", text: "Error discovering lists: " + (e instanceof Error ? e.message : String(e)) }]
-        };
+            content: [{ type: "text", text: "Error discovering lists: " + (e instanceof Error ? e.message : String(e)) }],
+            details: {}
+          };
       }
     }
   });
@@ -409,7 +416,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
     async execute(_toolCallId, params, signal, onUpdate) {
       const { listName, limit, refresh, language, topic, search, minStars, enrich = true } = params;
 
-      onUpdate?.({ content: [{ type: "text", text: `Loading repos from list "${listName}"...` }] });
+      onUpdate?.({ content: [{ type: "text", text: `Loading repos from list "${listName}"...` }], details: {} });
 
       // Try cache first
       let orderedNames: string[] | null = null;
@@ -417,7 +424,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
         const cached = await loadListCache(listName);
         if (cached) {
           orderedNames = cached.repos;
-          onUpdate?.({ content: [{ type: "text", text: `Using cached list data (${orderedNames.length} repos)` }] });
+          onUpdate?.({ content: [{ type: "text", text: `Using cached list data (${orderedNames.length} repos)` }], details: {} });
         }
       }
 
@@ -425,11 +432,12 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
         try {
           orderedNames = await fetchListReposOrdered(pi, listName, signal);
           await saveListCache(listName, orderedNames);
-          onUpdate?.({ content: [{ type: "text", text: `Fetched ${orderedNames.length} repos from list` }] });
+          onUpdate?.({ content: [{ type: "text", text: `Fetched ${orderedNames.length} repos from list` }], details: {} });
         } catch (e) {
           return {
             isError: true,
-            content: [{ type: "text", text: "Error fetching list \"" + listName + "\": " + (e instanceof Error ? e.message : String(e)) }]
+            content: [{ type: "text", text: "Error fetching list \"" + listName + "\": " + (e instanceof Error ? e.message : String(e)) }],
+            details: {}
           };
         }
       }
@@ -508,7 +516,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
     async execute(_toolCallId, params, signal, onUpdate) {
       const { listA, listB } = params;
 
-      onUpdate?.({ content: [{ type: "text", text: `Comparing "${listA}" with "${listB}"...` }] });
+      onUpdate?.({ content: [{ type: "text", text: `Comparing "${listA}" with "${listB}"...` }], details: {} });
 
       try {
         const [namesA, namesB] = await Promise.all([
@@ -543,8 +551,9 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       } catch (e) {
         return {
           isError: true,
-          content: [{ type: "text", text: "Error comparing lists: " + (e instanceof Error ? e.message : String(e)) }]
-        };
+            content: [{ type: "text", text: "Error comparing lists: " + (e instanceof Error ? e.message : String(e)) }],
+            details: {}
+          };
       }
     }
   });
@@ -588,7 +597,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
           // Cleanup
           try { await pi.exec("rm", [tmp]); } catch (_) { /* ignore */ }
         } catch (e) {
-          ctx.ui.notify("Failed to browse list: " + (e1 instanceof Error ? e1.message : String(e1)), "error");
+          ctx.ui.notify("Failed to browse list: " + (e instanceof Error ? e.message : String(e)), "error");
         }
         return;
       }
