@@ -308,7 +308,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
     }),
 
     async execute(_toolCallId, params, signal, onUpdate) {
-      const limit = Math.min(params.limit ?? 100, 500);
+      const limit = params.limit ?? 100;
       const { language, topic, search, minStars, sortBy, refresh } = params;
 
       onUpdate?.({ content: [{ type: "text", text: refresh ? "Refreshing starred repositories cache..." : "Loading starred repositories..." }], details: {} });
