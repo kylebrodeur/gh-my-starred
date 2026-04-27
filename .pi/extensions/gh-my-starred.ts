@@ -93,7 +93,7 @@ async function saveListCache(listName: string, repos: string[]) {
 
 // ── GitHub API helpers ─────────────────────────────────────────────
 
-async function fetchStarredRepos(pi: ExtensionAPI, signal?: AbortSignal, limit = 500): Promise<StarredRepo[]> {
+async function fetchStarredRepos(pi: ExtensionAPI, signal?: AbortSignal): Promise<StarredRepo[]> {
   // Use gh api with pagination for full data
   const result = await pi.exec("gh", [
     "api", "--paginate", "user/starred?sort=created&direction=desc&per_page=100",
@@ -110,7 +110,7 @@ async function fetchStarredRepos(pi: ExtensionAPI, signal?: AbortSignal, limit =
     .replace(/\]\n\[/g, ',');  // join newline-separated arrays (just in case)
 
   const repos = JSON.parse(normalizedJson) as StarredRepo[];
-  return repos.slice(0, limit);
+  return repos;
 }
 
 /**
@@ -324,7 +324,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
 
       if (!repos) {
         try {
-          repos = await fetchStarredRepos(pi, signal, limit);
+          repos = await fetchStarredRepos(pi, signal);
           await saveCachedRepos(repos);
           onUpdate?.({ content: [{ type: "text", text: `Fetched ${repos.length} repos from GitHub API` }], details: {} });
         } catch (e) {
