@@ -5,6 +5,9 @@ change_log:
   - timestamp: 2026-04-26T21:55:00Z
     agent_id: "pi-agent"
     note: "Updated pagination logic in fetchStarredRepos to cache all repos and apply limit only to returned results."
+  - timestamp: 2026-04-26T23:50:00Z
+    agent_id: "pi-agent"
+    note: "Added progressive enhancement recommendation to leverage pi-librarian for repo review."
 ---
 
 # gh-my-starred
@@ -123,3 +126,7 @@ pi remove npm:pi-gh-my-starred
 - PI tools (`starred_repos`, etc.) work **standalone** via `gh api`
 - `/starred` PI command requires both CLI + PI package installed
 - Terminal and PI installs are independent — no conflicts or duplicates
+
+## 🚀 Progressive Enhancements
+
+When reviewing repos discovered via `gh-my-starred`, agents can leverage **`pi-librarian`** as a powerful alternative or supplement to the `gh` CLI. While `gh` is excellent for metadata and high-level status, `pi-librarian` enables targeted reconnaissance, deep code-path discovery, and evidence-based research directly within the project's codebase without needing to clone every repo.
