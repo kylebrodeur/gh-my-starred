@@ -1,6 +1,10 @@
 ---
 name: gh-my-starred
 description: GitHub CLI extension for browsing starred repositories with AI-accessible JSON output
+change_log:
+  - timestamp: 2026-04-26T21:55:00Z
+    agent_id: "pi-agent"
+    note: "Updated pagination logic in fetchStarredRepos to cache all repos and apply limit only to returned results."
 ---
 
 # gh-my-starred
