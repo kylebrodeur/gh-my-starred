@@ -2,6 +2,9 @@
 name: gh-my-starred
 description: GitHub CLI extension for browsing starred repositories with AI-accessible JSON output
 change_log:
+  - timestamp: 2026-05-05T14:30:00Z
+    agent_id: "pi-agent"
+    note: "Fixed pi session crashes by adding missing sqlite3 dependency, handling async sqlite exceptions properly, and correctly serializing embedding float arrays."
   - timestamp: 2026-04-26T21:55:00Z
     agent_id: "pi-agent"
     note: "Updated pagination logic in fetchStarredRepos to cache all repos and apply limit only to returned results."

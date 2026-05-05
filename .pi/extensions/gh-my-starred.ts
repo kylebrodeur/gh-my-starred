@@ -22,6 +22,7 @@ import { Type } from "typebox";
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { sqliteCache } from "../../src/sqlite-cache";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -47,33 +48,18 @@ interface ListCacheEntry {
   repos: string[]; // ordered full_names
 }
 
-// ── Cache helpers ────────────────────────────────────────────────────
+// ── Cache helpers ────────────────────────────────────────────────
 
 const CACHE_DIR = process.env.XDG_CACHE_HOME
   ? join(process.env.XDG_CACHE_HOME, "gh-my-starred")
   : join(homedir(), ".cache", "gh-my-starred");
 
 const STARRED_CACHE = join(CACHE_DIR, "starred-repos.json");
-const LISTS_CACHE = join(CACHE_DIR, "star-lists.json");
 const LISTS_DIR = join(CACHE_DIR, "lists");
 
 async function ensureCache() {
   await mkdir(CACHE_DIR, { recursive: true });
   await mkdir(LISTS_DIR, { recursive: true });
-}
-
-async function loadCachedRepos(): Promise<StarredRepo[] | null> {
-  try {
-    const data = await readFile(STARRED_CACHE, "utf-8");
-    return JSON.parse(data) as StarredRepo[];
-  } catch (_e) {
-    return null;
-  }
-}
-
-async function saveCachedRepos(repos: StarredRepo[]) {
-  await ensureCache();
-  await writeFile(STARRED_CACHE, JSON.stringify(repos), { mode: 0o600 });
 }
 
 async function loadListCache(listName: string): Promise<ListCacheEntry | null> {
@@ -89,6 +75,12 @@ async function saveListCache(listName: string, repos: string[]) {
   await ensureCache();
   const entry: ListCacheEntry = { fetchedAt: new Date().toISOString(), repos };
   await writeFile(join(LISTS_DIR, `${listName}.json`), JSON.stringify(entry), { mode: 0o600 });
+}
+
+// Legacy cache functions for backward compatibility with command-line tool
+async function saveLegacyCachedRepos(repos: StarredRepo[]) {
+  await ensureCache();
+  await writeFile(STARRED_CACHE, JSON.stringify(repos), { mode: 0o600 });
 }
 
 // ── GitHub API helpers ─────────────────────────────────────────────
@@ -168,7 +160,7 @@ async function fetchStarLists(pi: ExtensionAPI, signal?: AbortSignal): Promise<S
 
     // Match list URLs like /stars/username/lists/list-name
     const seen = new Set<string>();
-    for (const match of html.matchAll(/href="\/stars\/[^"]+\/lists\/([^"]+)"/g)) {
+    for (const match of Array.from(html.matchAll(/href="\/stars\/[^"]+\/lists\/([^"]+)"/g))) {
       const slug = match[1];
       if (seen.has(slug)) continue;
       seen.add(slug);
@@ -211,7 +203,7 @@ async function fetchListReposOrdered(pi: ExtensionAPI, listName: string, signal?
     let foundOnPage = false;
 
     // Match repo links: href="/owner/repo"
-    for (const match of html.matchAll(/href="\/([^\/"]+\/[^\/"]+)"/g)) {
+    for (const match of Array.from(html.matchAll(/href="\/([^\/"]+\/[^\/"]+)"/g))) {
       const fullName = match[1];
 
       // Skip non-repo patterns
@@ -316,16 +308,33 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       let repos: StarredRepo[] | null = null;
 
       if (!refresh) {
-        repos = await loadCachedRepos();
-        if (repos) {
-          onUpdate?.({ content: [{ type: "text", text: `Using cached data (${repos.length} repos)` }], details: {} });
+        try {
+          repos = await sqliteCache.getAllRepositories();
+          if (repos && repos.length > 0) {
+            onUpdate?.({ content: [{ type: "text", text: `Using cached data (${repos.length} repos)` }], details: {} });
+          }
+        } catch (e) {
+          console.warn("Failed to load from SQLite cache, falling back to JSON:", e);
+          // Fall back to old JSON cache
+          try {
+            const data = await readFile(STARRED_CACHE, "utf-8");
+            repos = JSON.parse(data) as StarredRepo[];
+            if (repos && repos.length > 0) {
+              onUpdate?.({ content: [{ type: "text", text: `Using legacy JSON cache (${repos.length} repos)` }], details: {} });
+            }
+          } catch (fallbackError) {
+            console.warn("Failed to load from JSON cache either:", fallbackError);
+          }
         }
       }
 
       if (!repos) {
         try {
           repos = await fetchStarredRepos(pi, signal);
-          await saveCachedRepos(repos);
+          await sqliteCache.upsertRepositories(repos);
+          await sqliteCache.setLastSync();
+          // Also write to the legacy cache for backward compatibility with the command line tool
+          await saveLegacyCachedRepos(repos);
           onUpdate?.({ content: [{ type: "text", text: `Fetched ${repos.length} repos from GitHub API` }], details: {} });
         } catch (e) {
           return {
@@ -445,9 +454,22 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       // Get starred cache for metadata
       let starredMap = new Map<string, StarredRepo>();
       if (enrich) {
-        const starred = await loadCachedRepos();
-        if (starred) {
-          starred.forEach(r => starredMap.set(r.full_name, r));
+        try {
+          const starred = await sqliteCache.getAllRepositories();
+          if (starred) {
+            starred.forEach(r => starredMap.set(r.full_name, r));
+          }
+        } catch (e) {
+          console.warn("Failed to load from SQLite cache for enrichment, trying JSON:", e);
+          try {
+            const data = await readFile(STARRED_CACHE, "utf-8");
+            const starred = JSON.parse(data) as StarredRepo[];
+            if (starred) {
+              starred.forEach(r => starredMap.set(r.full_name, r));
+            }
+          } catch (fallbackError) {
+            console.warn("Failed to load from JSON cache either:", fallbackError);
+          }
         }
       }
 

@@ -1,0 +1,1 @@
+{"project":"pi-gh-my-starred","agent_id":"pi-agent","note":"Added learnings about fatal module load errors, unhandled async sqlite callbacks crashing sessions, and correct embedding float serialization.","timestamp":"2026-05-05T14:00:00Z"}

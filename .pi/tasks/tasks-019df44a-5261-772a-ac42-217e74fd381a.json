@@ -1,0 +1,38 @@
+{
+  "nextId": 4,
+  "tasks": [
+    {
+      "id": "1",
+      "subject": "Design and implement SQLite-based cache for gh-my-starred extension",
+      "description": "Replace the current JSON-file-based cache with a structured SQLite database that can:\n- Store repository data efficiently\n- Support incremental updates (only fetch changed/new repositories)\n- Store additional metadata like classifications and embeddings\n- Provide efficient querying without loading entire dataset\n- Handle large star collections (1000+ repos) smoothly\n\nThis will involve:\n1. Designing the database schema (repositories, classifications, embeddings, metadata tables)\n2. Creating migration path from existing JSON cache\n3. Implementing CRUD operations for repository data\n4. Adding support for storing and retrieving classifications\n5. Adding support for storing and retrieving embeddings\n6. Ensuring backward compatibility during transition",
+      "status": "completed",
+      "metadata": {},
+      "blocks": [],
+      "blockedBy": [],
+      "createdAt": 1777921781925,
+      "updatedAt": 1777922602528
+    },
+    {
+      "id": "2",
+      "subject": "Implement embedding generation and storage for semantic search",
+      "description": "Add support for generating and storing vector embeddings of repository descriptions to enable semantic search capabilities. This will:\n1. Integrate a lightweight sentence transformer model (e.g., sentence-transformers/all-MiniLM-L6-v2)\n2. Generate embeddings for repository descriptions (and optionally names/topics)\n3. Store embeddings in the SQLite cache\n4. Implement similarity search (cosine similarity) to find repositories by semantic meaning\n5. Expose this through a new tool or enhance existing search capabilities\n6. Consider performance implications and implement caching strategies\n7. Provide options for enabling/disabling embedding generation",
+      "status": "pending",
+      "metadata": {},
+      "blocks": [],
+      "blockedBy": [],
+      "createdAt": 1777921785026,
+      "updatedAt": 1777921785026
+    },
+    {
+      "id": "3",
+      "subject": "Implement classification system using subagents for intelligent categorization",
+      "description": "Create a classification system that leverages the existing PI agent capabilities through subagents instead of separate LLM integration. This will:\n1. Define a set of meaningful categories for GitHub repositories \n2. Use the orchestrator agent to spawn subagents for classification tasks\n3. Implement a classification workflow that can use either:\n   - Zero-shot classification via reasoning (using the agent's understanding)\n   - Retrieval-based classification (comparing to known examples)\n   - Rule-based fallbacks for when AI classification isn't available\n4. Store classifications in the SQLite cache\n5. Allow filtering and organizing by category\n6. Provide both interactive and batch classification modes\n7. Make the system extensible for custom categories\n8. Ensure classification can be updated when repository metadata changes",
+      "status": "pending",
+      "metadata": {},
+      "blocks": [],
+      "blockedBy": [],
+      "createdAt": 1777921792942,
+      "updatedAt": 1777921792942
+    }
+  ]
+}
