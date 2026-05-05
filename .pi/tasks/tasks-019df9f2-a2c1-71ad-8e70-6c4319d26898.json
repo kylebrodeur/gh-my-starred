@@ -5,12 +5,12 @@
       "id": "2",
       "subject": "Run tests, update changelog, and publish package",
       "description": "1. Run CI tests via package manager\n2. Update CHANGELOG.md\n3. Bump package version in package.json\n4. Commit and push changes to GitHub\n5. Publish package to npm",
-      "status": "in_progress",
+      "status": "completed",
       "metadata": {},
       "blocks": [],
       "blockedBy": [],
       "createdAt": 1778015338809,
-      "updatedAt": 1778015347511
+      "updatedAt": 1778015422637
     }
   ]
 }
