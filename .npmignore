@@ -24,8 +24,8 @@ node_modules/
 # The gh CLI wrapper is not needed for PI
 gh-my-starred
 
-# CLI source is not needed for PI (PI extension is self-contained)
-src/
+# CLI source is needed for PI because it imports sqlite-cache
+# src/
 
 # Test files — not needed at runtime
 test/
