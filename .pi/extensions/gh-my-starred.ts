@@ -580,6 +580,134 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
     }
   });
 
+  // ── TOOL: add_to_star_list ───────────────────────────────────────
+
+  pi.registerTool({
+    name: "add_to_star_list",
+    label: "Add to Star List",
+    description: "Add one or more repositories to a specific star list. Requires the 'user' scope on your GitHub token.",
+    promptSnippet: "Add repositories to a GitHub star list. Remember to check if the user has the 'user' scope.",
+    promptGuidelines: [
+      "Use add_to_star_list when the user wants to organize their starred repositories into lists",
+      "Explain to the user they may need to run 'gh auth refresh -s user' if they encounter an INSUFFICIENT_SCOPES error",
+      "You must provide the exact listName as it appears in list_star_lists"
+    ],
+    parameters: Type.Object({
+      listName: Type.String({ description: "Name of the target star list" }),
+      repos: Type.Array(Type.String(), { description: "Array of repository full names (owner/repo)" })
+    }),
+
+    async execute(_toolCallId, params, signal, onUpdate) {
+      const { listName, repos } = params;
+
+      if (repos.length === 0) {
+        return { content: [{ type: "text", text: "No repositories provided to add." }], details: {} };
+      }
+
+      onUpdate?.({ content: [{ type: "text", text: `Adding ${repos.length} repos to "${listName}"...` }], details: {} });
+
+      try {
+        // 1. Get all lists to find the target list ID
+        const listsData = await pi.exec("gh", ["api", "graphql", "-f", "query=query { viewer { lists(first: 100) { nodes { id name } } } }"], { timeout: 10000 });
+        if (listsData.code !== 0) {
+          if (listsData.stderr.includes("INSUFFICIENT_SCOPES")) {
+            return { isError: true, content: [{ type: "text", text: "Insufficient scopes. Please run `gh auth refresh -s user` in your terminal to grant permission to modify lists." }], details: {} };
+          }
+          throw new Error("Failed to fetch lists: " + listsData.stderr);
+        }
+        
+        const lists = JSON.parse(listsData.stdout).data.viewer.lists.nodes;
+        const targetList = lists.find((l: any) => l.name.toLowerCase() === listName.toLowerCase());
+        
+        if (!targetList) {
+          return { isError: true, content: [{ type: "text", text: `List "${listName}" not found. Create it on GitHub first.` }], details: {} };
+        }
+        
+        const listId = targetList.id;
+        
+        // 2. Fetch all user lists and their items to know which lists repos are CURRENTLY in
+        // (updateUserListsForItem overrides all lists, so we must append to existing ones)
+        onUpdate?.({ content: [{ type: "text", text: "Fetching current list assignments to prevent overwriting..." }], details: {} });
+        
+        const repoToCurrentLists: Record<string, string[]> = {};
+        for (const list of lists) {
+          let hasNextPage = true;
+          let endCursor = null;
+          
+          while (hasNextPage) {
+            const cursorArg = endCursor ? `, after: "${endCursor}"` : "";
+            const listQuery = `query { node(id: "${list.id}") { ... on UserList { items(first: 100${cursorArg}) { pageInfo { hasNextPage endCursor } nodes { ... on Repository { nameWithOwner } } } } } }`;
+            
+            const res = await pi.exec("gh", ["api", "graphql", "-f", `query=${listQuery}`], { timeout: 15000 });
+            if (res.code !== 0) throw new Error(`Failed fetching items for list ${list.name}`);
+            
+            const itemsConn = JSON.parse(res.stdout).data.node.items;
+            for (const item of itemsConn.nodes) {
+              if (!item || !item.nameWithOwner) continue;
+              if (!repoToCurrentLists[item.nameWithOwner]) repoToCurrentLists[item.nameWithOwner] = [];
+              repoToCurrentLists[item.nameWithOwner].push(list.id);
+            }
+            
+            hasNextPage = itemsConn.pageInfo.hasNextPage;
+            endCursor = itemsConn.pageInfo.endCursor;
+          }
+        }
+
+        let successCount = 0;
+        let errors = [];
+
+        // 3. Process each repo
+        for (let i = 0; i < repos.length; i++) {
+          const repo = repos[i];
+          onUpdate?.({ content: [{ type: "text", text: `Adding ${repo}... (${i + 1}/${repos.length})` }], details: {} });
+          
+          try {
+            // Get repo ID
+            const repoData = await pi.exec("gh", ["repo", "view", repo, "--json", "id"], { timeout: 10000 });
+            if (repoData.code !== 0) throw new Error("Could not find repo ID for " + repo);
+            const repoId = JSON.parse(repoData.stdout).id;
+            
+            // Determine combined lists
+            const currentLists = repoToCurrentLists[repo] || [];
+            const newListIds = Array.from(new Set([...currentLists, listId]));
+            const listIdsFormatted = newListIds.map(id => `"${id}"`).join(", ");
+            
+            // Mutate
+            const mutation = `mutation { updateUserListsForItem(input: {itemId: "${repoId}", listIds: [${listIdsFormatted}]}) { clientMutationId } }`;
+            const mutRes = await pi.exec("gh", ["api", "graphql", "-f", `query=${mutation}`], { timeout: 10000 });
+            
+            if (mutRes.code !== 0) {
+              if (mutRes.stderr.includes("INSUFFICIENT_SCOPES")) {
+                throw new Error("Insufficient scopes. Run `gh auth refresh -s user` in your terminal.");
+              }
+              throw new Error(mutRes.stderr);
+            }
+            
+            successCount++;
+          } catch (e) {
+            errors.push(`${repo}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+
+        let text = `Successfully added ${successCount} out of ${repos.length} repositories to "${listName}".`;
+        if (errors.length > 0) {
+          text += `\n\nErrors:\n${errors.map(e => `• ${e}`).join("\n")}`;
+        }
+
+        return {
+          content: [{ type: "text", text }],
+          details: { successCount, errors }
+        };
+      } catch (e) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: "Error adding to list: " + (e instanceof Error ? e.message : String(e)) }],
+          details: {}
+        };
+      }
+    }
+  });
+
   // ── COMMAND: /starred ──────────────────────────────────────────
 
   pi.registerCommand("starred", {

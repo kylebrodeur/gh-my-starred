@@ -48,7 +48,7 @@ fi
 
 # Test 5: Version works
 echo "Test: --version shows version"
-if ./gh-my-starred --version | grep -q "0.2.3"; then
+if ./gh-my-starred --version | grep -q "0.3.0"; then
   echo "  PASS"
 else
   echo "  FAIL"

@@ -2,6 +2,9 @@
 name: gh-my-starred
 description: GitHub CLI extension for browsing starred repositories with AI-accessible JSON output
 change_log:
+  - timestamp: 2026-05-06T15:00:00Z
+    agent_id: "pi-agent"
+    note: "Added add_to_star_list tool to mutate user star lists and documented required user scope."
   - timestamp: 2026-05-05T14:30:00Z
     agent_id: "pi-agent"
     note: "Fixed pi session crashes by adding missing sqlite3 dependency, handling async sqlite exceptions properly, and correctly serializing embedding float arrays."
@@ -74,6 +77,15 @@ gh my-starred --list "Research" --json
 | `list_star_lists` | Discover all star lists |
 | `get_list_repos` | Get ordered repos from a specific list |
 | `compare_lists` | Compare two star lists |
+| `add_to_star_list` | Add repositories to a star list |
+
+## Permissions
+
+Some features (like `add_to_star_list`) require the ability to mutate user lists. If you encounter an `INSUFFICIENT_SCOPES` error, you must grant the `user` scope to your GitHub CLI:
+
+```bash
+gh auth refresh -s user
+```
 
 ## Updating
 

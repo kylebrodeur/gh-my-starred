@@ -1,7 +1,7 @@
 # gh-my-starred
 
 [![GitHub CLI](https://img.shields.io/badge/github--cli-extension-brightgreen?logo=github)](https://cli.github.com/)
-[![Version](https://img.shields.io/badge/version-0.2.9-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
+[![Version](https://img.shields.io/badge/version-0.3.0-blue)](https://github.com/kylebrodeur/gh-my-starred/releases)
 [![npm](https://img.shields.io/npm/v/pi-gh-my-starred)](https://www.npmjs.com/package/pi-gh-my-starred)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -76,10 +76,10 @@ For specific versions:
 
 ```bash
 # Specific npm version
-pi install npm:pi-gh-my-starred@0.2.9
+pi install npm:pi-gh-my-starred@0.3.0
 
 # Specific git tag
-pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.9
+pi install git:github.com/kylebrodeur/gh-my-starred@v0.3.0
 ```
 
 ### Manual Installation
@@ -252,7 +252,7 @@ pi install npm:pi-gh-my-starred
 Or via git:
 
 ```bash
-pi install git:github.com/kylebrodeur/gh-my-starred@v0.2.9
+pi install git:github.com/kylebrodeur/gh-my-starred@v0.3.0
 ```
 
 Then reload PI with `/reload`.
@@ -268,7 +268,7 @@ cp .pi/extensions/gh-my-starred.ts ~/.pi/agent/extensions/
 
 ### Dual-Install Requirement for `/starred`
 
-The PI tools (`starred_repos`, `list_star_lists`, `get_list_repos`, `compare_lists`) work **standalone** — they call the GitHub API directly via `gh api`.
+The PI tools (`starred_repos`, `list_star_lists`, `get_list_repos`, `compare_lists`, `add_to_star_list`) work **standalone** — they call the GitHub API directly via `gh api`.
 
 However, the `/starred` command is an **interactive fzf launcher** that shells out to `gh my-starred`. If you run `/starred` without the CLI extension installed, you'll see a message telling you to run:
 
@@ -288,6 +288,15 @@ Once installed, AI agents in PI can use these tools:
 | `list_star_lists` | Discover all star lists for the user |
 | `get_list_repos` | Get ordered repos from a specific star list |
 | `compare_lists` | Compare two star lists (shared, unique) |
+| `add_to_star_list` | Add repositories to a star list |
+
+## Permissions
+
+Some features (like `add_to_star_list`) require the ability to mutate user lists. If you encounter an `INSUFFICIENT_SCOPES` error, you must grant the `user` scope to your GitHub CLI:
+
+```bash
+gh auth refresh -s user
+```
 
 #### `starred_repos` Parameters
 
