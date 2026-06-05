@@ -22,7 +22,7 @@ import { Type } from "typebox";
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { sqliteCache } from "../../src/sqlite-cache";
+// import { sqliteCache } from "../../src/sqlite-cache.js";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -309,12 +309,6 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
 
       if (!refresh) {
         try {
-          repos = await sqliteCache.getAllRepositories();
-          if (repos && repos.length > 0) {
-            onUpdate?.({ content: [{ type: "text", text: `Using cached data (${repos.length} repos)` }], details: {} });
-          }
-        } catch (e) {
-          console.warn("Failed to load from SQLite cache, falling back to JSON:", e);
           // Fall back to old JSON cache
           try {
             const data = await readFile(STARRED_CACHE, "utf-8");
@@ -325,14 +319,14 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
           } catch (fallbackError) {
             console.warn("Failed to load from JSON cache either:", fallbackError);
           }
+        } catch (e) {
+          console.warn("Failed to load from SQLite cache, falling back to JSON:", e);
         }
       }
 
       if (!repos) {
         try {
           repos = await fetchStarredRepos(pi, signal);
-          await sqliteCache.upsertRepositories(repos);
-          await sqliteCache.setLastSync();
           // Also write to the legacy cache for backward compatibility with the command line tool
           await saveLegacyCachedRepos(repos);
           onUpdate?.({ content: [{ type: "text", text: `Fetched ${repos.length} repos from GitHub API` }], details: {} });
@@ -455,21 +449,13 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       let starredMap = new Map<string, StarredRepo>();
       if (enrich) {
         try {
-          const starred = await sqliteCache.getAllRepositories();
+          const data = await readFile(STARRED_CACHE, "utf-8");
+          const starred = JSON.parse(data) as StarredRepo[];
           if (starred) {
             starred.forEach(r => starredMap.set(r.full_name, r));
           }
-        } catch (e) {
-          console.warn("Failed to load from SQLite cache for enrichment, trying JSON:", e);
-          try {
-            const data = await readFile(STARRED_CACHE, "utf-8");
-            const starred = JSON.parse(data) as StarredRepo[];
-            if (starred) {
-              starred.forEach(r => starredMap.set(r.full_name, r));
-            }
-          } catch (fallbackError) {
-            console.warn("Failed to load from JSON cache either:", fallbackError);
-          }
+        } catch (fallbackError) {
+          console.warn("Failed to load from JSON cache either:", fallbackError);
         }
       }
 
