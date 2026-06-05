@@ -1,0 +1,3 @@
+npx biome check --write .
+git add -A
+npx tsc --noEmit

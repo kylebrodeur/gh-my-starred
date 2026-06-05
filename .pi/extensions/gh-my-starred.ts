@@ -299,7 +299,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       refresh: Type.Optional(Type.Boolean({ description: "Force refresh cache before querying" }))
     }),
 
-    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined) {
+    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
       const limit = params.limit ?? 100;
       const { language, topic, search, minStars, sortBy, refresh } = params;
 
@@ -370,7 +370,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       refresh: Type.Optional(Type.Boolean({ description: "Force refresh list discovery" }))
     }),
 
-    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined) {
+    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
       onUpdate?.({ content: [{ type: "text", text: "Discovering star lists..." }], details: {} });
 
       try {
@@ -422,7 +422,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       enrich: Type.Optional(Type.Boolean({ description: "Enrich with full metadata from starred cache (default: true)" }))
     }),
 
-    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined) {
+    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
       const { listName, limit, refresh, language, topic, search, minStars, enrich = true } = params;
 
       onUpdate?.({ content: [{ type: "text", text: `Loading repos from list "${listName}"...` }], details: {} });
@@ -535,7 +535,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       listB: Type.String({ description: "Second list name" })
     }),
 
-    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined) {
+    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
       const { listA, listB } = params;
 
       onUpdate?.({ content: [{ type: "text", text: `Comparing "${listA}" with "${listB}"...` }], details: {} });
@@ -597,7 +597,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       repos: Type.Array(Type.String(), { description: "Array of repository full names (owner/repo)" })
     }),
 
-    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined) {
+    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
       const { listName, repos } = params;
 
       if (repos.length === 0) {
