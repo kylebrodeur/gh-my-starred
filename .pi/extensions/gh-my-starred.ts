@@ -89,19 +89,17 @@ async function fetchStarredRepos(pi: ExtensionAPI, signal?: AbortSignal): Promis
   // Use gh api with pagination for full data
   const result = await pi.exec("gh", [
     "api", "--paginate", "user/starred?sort=created&direction=desc&per_page=100",
-    "--jq", "."
+    "--jq", ".[]"
   ], { signal, timeout: 120000 });
 
   if (result.code !== 0) {
     throw new Error(result.stderr || "Failed to fetch starred repos");
   }
 
-  // Handle concatenated JSON arrays from gh api --paginate
-  const normalizedJson = result.stdout.trim()
-    .replace(/\]\s*\[/g, ',')  // join adjacent arrays separated by whitespace/newlines
-    .replace(/\]\n\[/g, ',');  // join newline-separated arrays (just in case)
-
-  const repos = JSON.parse(normalizedJson) as StarredRepo[];
+  // gh api --paginate with .[] streams JSON objects, one per line.
+  const repos = result.stdout.trim().split('\n')
+    .filter(line => line.startsWith('{')) // Ensure we only parse JSON objects
+    .map(line => JSON.parse(line)) as StarredRepo[];
   return repos;
 }
 

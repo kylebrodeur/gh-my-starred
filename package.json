@@ -1,6 +1,6 @@
 {
   "name": "pi-gh-my-starred",
-    "version": "0.3.4",
+      "version": "0.3.5",
   "description": "PI extension for browsing GitHub starred repositories and star lists",
   "author": "kylebrodeur",
   "license": "MIT",
