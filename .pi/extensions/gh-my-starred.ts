@@ -567,6 +567,223 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
   // ── TOOL: add_to_star_list ───────────────────────────────────────
 
   pi.registerTool({
+    name: "create_star_list",
+    label: "Create Star List",
+    description: "Create a new star list on GitHub.",
+    promptSnippet: "Create a new GitHub star list for organizing repositories.",
+    promptGuidelines: [
+      "Use create_star_list when the user wants to create a new list for their starred repos.",
+      "The list name must be unique.",
+      "A description for the list is optional but recommended."
+    ],
+    parameters: Type.Object({
+      name: Type.String({ description: "The name for the new star list." }),
+      description: Type.Optional(Type.String({ description: "An optional description for the list." }))
+    }),
+    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
+      const { name, description } = params;
+      onUpdate?.({ content: [{ type: "text", text: `Creating star list "${name}"...` }], details: {} });
+      try {
+        const userResult = await pi.exec("gh", ["api", "user", "--jq", ".id"], { timeout: 10000 });
+        if (userResult.code !== 0) throw new Error("Could not determine GitHub user ID.");
+        const userId = userResult.stdout.trim();
+        const descString = description ? `description: "${description}", ` : "";
+        const mutation = `mutation { createUserList(input: {ownerId: "${userId}", name: "${name}", ${descString}isPublic: true}) { list { name url } } }`;
+        const result = await pi.exec("gh", ["api", "graphql", "-f", `query=${mutation}`], { timeout: 15000 });
+        if (result.code !== 0) {
+          if (result.stderr.includes("INSUFFICIENT_SCOPES")) {
+            return { isError: true, content: [{ type: "text", text: "Insufficient scopes. Please run `gh auth refresh -s user` in your terminal to grant permission to create lists." }], details: {} };
+          }
+          if (result.stderr.includes("Name has already been taken")) {
+            return { isError: true, content: [{ type: "text", text: `Error: A list named "${name}" already exists.` }], details: {} };
+          }
+          throw new Error(result.stderr);
+        }
+        const data = JSON.parse(result.stdout);
+        const listUrl = data.data.createUserList.list.url;
+        return { content: [{ type: "text", text: `Successfully created star list "${name}".\nView it here: ${listUrl}` }], details: { name, description, url: listUrl } };
+      } catch (e) {
+        return { isError: true, content: [{ type: "text", text: "Error creating list: " + (e instanceof Error ? e.message : String(e)) }], details: {} };
+      }
+    }
+  });
+
+  pi.registerTool({
+    name: "update_star_list",
+    label: "Update Star List",
+    description: "Update the name or description of an existing star list.",
+    promptSnippet: "Rename a GitHub star list or change its description.",
+    promptGuidelines: [
+      "Use update_star_list to modify the metadata of an existing list.",
+      "You must provide the current name of the list to identify it.",
+      "You can provide a new name, a new description, or both."
+    ],
+    parameters: Type.Object({
+      currentName: Type.String({ description: "The current name of the list to update." }),
+      newName: Type.Optional(Type.String({ description: "The new name for the list." })),
+      newDescription: Type.Optional(Type.String({ description: "The new description for the list." }))
+    }),
+    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
+      const { currentName, newName, newDescription } = params;
+      if (!newName && newDescription === undefined) {
+        return { isError: true, content: [{ type: "text", text: "Error: You must provide either a new name or a new description." }], details: {} };
+      }
+      onUpdate?.({ content: [{ type: "text", text: `Updating star list "${currentName}"...` }], details: {} });
+      try {
+        const listsData = await pi.exec("gh", ["api", "graphql", "-f", "query=query { viewer { lists(first: 100) { nodes { id name } } } }"], { timeout: 10000 });
+        if (listsData.code !== 0) throw new Error("Failed to fetch lists: " + listsData.stderr);
+        const lists = JSON.parse(listsData.stdout).data.viewer.lists.nodes;
+        const targetList = lists.find((l: any) => l.name.toLowerCase() === currentName.toLowerCase());
+        if (!targetList) {
+          return { isError: true, content: [{ type: "text", text: `List "${currentName}" not found.` }], details: {} };
+        }
+        const listId = targetList.id;
+        let updates = "";
+        if (newName) updates += `name: "${newName}", `;
+        if (newDescription !== undefined) updates += `description: "${newDescription || ""}", `;
+        const mutation = `mutation { updateUserList(input: {listId: "${listId}", ${updates}}) { list { name url } } }`;
+        const result = await pi.exec("gh", ["api", "graphql", "-f", `query=${mutation}`], { timeout: 15000 });
+        if (result.code !== 0) {
+          if (result.stderr.includes("INSUFFICIENT_SCOPES")) {
+            return { isError: true, content: [{ type: "text", text: "Insufficient scopes. Please run `gh auth refresh -s user` in your terminal to grant permission to update lists." }], details: {} };
+          }
+          if (result.stderr.includes("Name has already been taken")) {
+            return { isError: true, content: [{ type: "text", text: `Error: A list named "${newName}" already exists.` }], details: {} };
+          }
+          throw new Error(result.stderr);
+        }
+        const finalName = newName || currentName;
+        return { content: [{ type: "text", text: `Successfully updated list. It is now named "${finalName}".` }], details: { oldName: currentName, newName, newDescription } };
+      } catch (e) {
+        return { isError: true, content: [{ type: "text", text: "Error updating list: " + (e instanceof Error ? e.message : String(e)) }], details: {} };
+      }
+    }
+  });
+
+  pi.registerTool({
+    name: "delete_star_list",
+    label: "Delete Star List",
+    description: "Deletes a star list. This action is irreversible.",
+    promptSnippet: "Delete a GitHub star list.",
+    promptGuidelines: [
+      "Use delete_star_list to permanently remove a star list.",
+      "This action cannot be undone. Use with caution.",
+      "By default, it requires confirmation. Use `force: true` to bypass the prompt."
+    ],
+    parameters: Type.Object({
+      name: Type.String({ description: "The name of the list to delete." }),
+      force: Type.Optional(Type.Boolean({ description: "If true, bypasses the confirmation prompt. Defaults to false." }))
+    }),
+    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
+      const { name, force = false } = params;
+      if (!force) {
+        const confirmed = await ctx.ui.confirm("Delete List?", `Are you sure you want to permanently delete the star list "${name}"?`);
+        if (!confirmed) {
+          return { content: [{ type: "text", text: "Deletion cancelled." }], details: {} };
+        }
+      }
+      onUpdate?.({ content: [{ type: "text", text: `Deleting star list "${name}"...` }], details: {} });
+      try {
+        const listsData = await pi.exec("gh", ["api", "graphql", "-f", "query=query { viewer { lists(first: 100) { nodes { id name } } } }"], { timeout: 10000 });
+        if (listsData.code !== 0) throw new Error("Failed to fetch lists: " + listsData.stderr);
+        const lists = JSON.parse(listsData.stdout).data.viewer.lists.nodes;
+        const targetList = lists.find((l: any) => l.name.toLowerCase() === name.toLowerCase());
+        if (!targetList) {
+          return { isError: true, content: [{ type: "text", text: `List "${name}" not found.` }], details: {} };
+        }
+        const listId = targetList.id;
+        const mutation = `mutation { deleteUserList(input: {listId: "${listId}"}) { clientMutationId } }`;
+        const result = await pi.exec("gh", ["api", "graphql", "-f", `query=${mutation}`], { timeout: 15000 });
+        if (result.code !== 0) {
+          if (result.stderr.includes("INSUFFICIENT_SCOPES")) {
+            return { isError: true, content: [{ type: "text", text: "Insufficient scopes. Please run `gh auth refresh -s user` in your terminal to grant permission to delete lists." }], details: {} };
+          }
+          throw new Error(result.stderr);
+        }
+        return { content: [{ type: "text", text: `Successfully deleted star list "${name}".` }], details: { name } };
+      } catch (e) {
+        return { isError: true, content: [{ type: "text", text: "Error deleting list: " + (e instanceof Error ? e.message : String(e)) }], details: {} };
+      }
+    }
+  });
+
+  pi.registerTool({
+    name: "remove_from_star_list",
+    label: "Remove from Star List",
+    description: "Remove one or more repositories from a specific star list.",
+    promptSnippet: "Remove repositories from a GitHub star list.",
+    promptGuidelines: [
+      "Use remove_from_star_list when the user wants to remove repos from a list.",
+      "The logic is the inverse of adding, and requires care to not remove repos from other lists they belong to."
+    ],
+    parameters: Type.Object({
+      listName: Type.String({ description: "The name of the list from which to remove repos." }),
+      repos: Type.Array(Type.String(), { description: "Array of repository full names (owner/repo) to remove." })
+    }),
+    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
+      const { listName, repos } = params;
+      if (repos.length === 0) {
+        return { content: [{ type: "text", text: "No repositories provided to remove." }], details: {} };
+      }
+      onUpdate?.({ content: [{ type: "text", text: `Removing ${repos.length} repos from "${listName}"...` }], details: {} });
+      try {
+        const listsData = await pi.exec("gh", ["api", "graphql", "-f", "query=query { viewer { lists(first: 100) { nodes { id name } } } }"], { timeout: 10000 });
+        if (listsData.code !== 0) throw new Error("Failed to fetch lists: " + listsData.stderr);
+        const lists = JSON.parse(listsData.stdout).data.viewer.lists.nodes;
+        const targetList = lists.find((l: any) => l.name.toLowerCase() === listName.toLowerCase());
+        if (!targetList) {
+          return { isError: true, content: [{ type: "text", text: `List "${listName}" not found.` }], details: {} };
+        }
+        const listIdToRemove = targetList.id;
+        onUpdate?.({ content: [{ type: "text", text: "Fetching current list assignments to prevent overwriting..." }], details: {} });
+        const repoToCurrentLists: Record<string, string[]> = {};
+        for (const list of lists) {
+          let hasNextPage = true, endCursor: string | null = null;
+          while (hasNextPage) {
+            const cursorArg = endCursor ? `, after: "${endCursor}"` : "";
+            const listQuery = `query { node(id: "${list.id}") { ... on UserList { items(first: 100${cursorArg}) { pageInfo { hasNextPage endCursor } nodes { ... on Repository { nameWithOwner } } } } } }`;
+            const res = await pi.exec("gh", ["api", "graphql", "-f", `query=${listQuery}`], { timeout: 15000 });
+            if (res.code !== 0) throw new Error(`Failed fetching items for list ${list.name}`);
+            const itemsConn = JSON.parse(res.stdout).data.node.items;
+            for (const item of itemsConn.nodes) {
+              if (item?.nameWithOwner) {
+                if (!repoToCurrentLists[item.nameWithOwner]) repoToCurrentLists[item.nameWithOwner] = [];
+                repoToCurrentLists[item.nameWithOwner].push(list.id);
+              }
+            }
+            hasNextPage = itemsConn.pageInfo.hasNextPage;
+            endCursor = itemsConn.pageInfo.endCursor;
+          }
+        }
+        let successCount = 0; const errors: string[] = [];
+        for (let i = 0; i < repos.length; i++) {
+          const repo = repos[i];
+          onUpdate?.({ content: [{ type: "text", text: `Removing ${repo}... (${i + 1}/${repos.length})` }], details: {} });
+          try {
+            const repoData = await pi.exec("gh", ["repo", "view", repo, "--json", "id"], { timeout: 10000 });
+            if (repoData.code !== 0) throw new Error("Could not find repo ID for " + repo);
+            const repoId = JSON.parse(repoData.stdout).id;
+            const currentLists = repoToCurrentLists[repo] || [];
+            const newListIds = currentLists.filter((id: string) => id !== listIdToRemove);
+            const listIdsFormatted = newListIds.map((id: string) => `"${id}"`).join(", ");
+            const mutation = `mutation { updateUserListsForItem(input: {itemId: "${repoId}", listIds: [${listIdsFormatted}]}) { clientMutationId } }`;
+            const mutRes = await pi.exec("gh", ["api", "graphql", "-f", `query=${mutation}`], { timeout: 10000 });
+            if (mutRes.code !== 0) throw new Error(mutRes.stderr);
+            successCount++;
+          } catch (e) {
+            errors.push(`${repo}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        let text = `Successfully removed ${successCount} out of ${repos.length} repositories from "${listName}".`;
+        if (errors.length > 0) text += `\n\nErrors:\n${errors.map((e: string) => `• ${e}`).join("\n")}`;
+        return { content: [{ type: "text", text }], details: { successCount, errors } };
+      } catch (e) {
+        return { isError: true, content: [{ type: "text", text: "Error removing from list: " + (e instanceof Error ? e.message : String(e)) }], details: {} };
+      }
+    }
+  });
+
+  pi.registerTool({
     name: "add_to_star_list",
     label: "Add to Star List",
     description: "Add one or more repositories to a specific star list. Requires the 'user' scope on your GitHub token.",
@@ -693,6 +910,138 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
   });
 
   // ── COMMAND: /starred ──────────────────────────────────────────
+
+  pi.registerTool({
+    name: "analyze_repo",
+    label: "Analyze Repository",
+    description: "Fetches detailed, structured metadata for a specific GitHub repository.",
+    promptSnippet: "Get detailed information about a repository to understand its purpose, popularity, and technology stack.",
+    promptGuidelines: [
+      "Use analyze_repo to gather data for organizing or making decisions about a repository.",
+      "You can specify which fields to fetch to keep the output focused and efficient.",
+      "This is the primary tool for gathering intelligence before using list management tools."
+    ],
+    parameters: Type.Object({
+      repo: Type.String({ description: "The full name of the repository (e.g., 'owner/repo')." }),
+      fields: Type.Optional(Type.Array(Type.String(), { description: "Specific fields to fetch. Defaults to a comprehensive list." }))
+    }),
+    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
+      const { repo, fields } = params;
+      const defaultFields = ["name", "nameWithOwner", "description", "stargazerCount", "forkCount", "pushedAt", "licenseInfo", "languages", "topics", "owner", "url"];
+      const fieldsToFetch = fields && fields.length > 0 ? fields : defaultFields;
+      onUpdate?.({ content: [{ type: "text", text: `Analyzing repository: ${repo}...` }], details: {} });
+      try {
+        const result = await pi.exec("gh", ["repo", "view", repo, "--json", fieldsToFetch.join(",")], { timeout: 15000 });
+        if (result.code !== 0) {
+          throw new Error(`Could not fetch data for repository '${repo}'. Is the name correct?`);
+        }
+        const repoData = JSON.parse(result.stdout);
+        if (repoData.languages) {
+          const topLangs = repoData.languages.edges
+            .sort((a: any, b: any) => b.size - a.size)
+            .slice(0, 3)
+            .map((lang: any) => lang.node.name);
+          repoData.languages = topLangs;
+        }
+        return { content: [{ type: "text", text: `Successfully analyzed ${repo}. Use the 'details' view to see the structured data.` }], details: { analysis: repoData } };
+      } catch (e) {
+        return { isError: true, content: [{ type: "text", text: "Error analyzing repository: " + (e instanceof Error ? e.message : String(e)) }], details: {} };
+      }
+    }
+  });
+
+  pi.registerTool({
+    name: "organize_stars_by_language",
+    label: "Organize Stars by Language",
+    description: "Automatically organizes uncategorized starred repos into language-specific star lists.",
+    promptSnippet: "Analyze all starred repositories and automatically file them into lists based on their primary programming language.",
+    promptGuidelines: [
+      "Use this tool to perform a large-scale, automated organization of your starred repos.",
+      "It will create new language lists (e.g., 'Go', 'Rust') as needed.",
+      "This can be a long-running operation. Use the `limit` parameter for testing."
+    ],
+    parameters: Type.Object({
+      dryRun: Type.Optional(Type.Boolean({ description: "If true, it will report the changes without performing them. Defaults to false." })),
+      limit: Type.Optional(Type.Number({ description: "Process a maximum of this many uncategorized repositories." }))
+    }),
+    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
+      const { dryRun = false, limit } = params;
+      onUpdate?.({ content: [{ type: "text", text: `Starting automated organization... ${dryRun ? '(Dry Run)' : ''}` }], details: {} });
+      try {
+        onUpdate?.({ content: [{ type: "text", text: "Fetching all starred repos and list memberships..." }], details: {} });
+        const allRepos = await fetchStarredRepos(pi, signal);
+        const allLists = await fetchStarLists(pi, signal);
+        const reposInAnyList = new Set<string>();
+        for (const list of allLists) {
+          const listRepos = await fetchListReposOrdered(pi, list.name, signal);
+          listRepos.forEach(repoName => reposInAnyList.add(repoName));
+        }
+        let uncategorized = allRepos.filter(r => !reposInAnyList.has(r.full_name) && r.language);
+        if (limit) uncategorized = uncategorized.slice(0, limit);
+        onUpdate?.({ content: [{ type: "text", text: `Found ${uncategorized.length} uncategorized repositories to process.` }], details: {} });
+        if (uncategorized.length === 0) {
+          return { content: [{ type: "text", text: "All repositories are already organized." }], details: {} };
+        }
+        const toOrganize = new Map<string, string[]>();
+        for (const repo of uncategorized) {
+          if (repo.language) {
+            const lang = repo.language;
+            if (!toOrganize.has(lang)) toOrganize.set(lang, []);
+            toOrganize.get(lang)!.push(repo.full_name);
+          }
+        }
+        let changesMade = 0;
+        const summary: string[] = [];
+        for (const [lang, repos] of toOrganize.entries()) {
+          onUpdate?.({ content: [{ type: "text", text: `Processing ${repos.length} repos for language: ${lang}` }], details: {} });
+          const listExists = allLists.some(l => l.name.toLowerCase() === lang.toLowerCase());
+          if (!listExists) {
+            summary.push(`- Would create new list: "${lang}"`);
+            if (!dryRun) {
+              const userResult = await pi.exec("gh", ["api", "user", "--jq", ".id"], { timeout: 10000 });
+              if (userResult.code === 0) {
+                const userId = userResult.stdout.trim();
+                const mutation = `mutation { createUserList(input: {ownerId: "${userId}", name: "${lang}", description: "Repositories written in ${lang}", isPublic: true}) { list { id name } } }`;
+                const createResult = await pi.exec("gh", ["api", "graphql", "-f", `query=${mutation}`], { timeout: 15000 });
+                if (createResult.code !== 0 && !createResult.stderr.includes("Name has already been taken")) {
+                  summary.push(`  - FAILED to create: ${createResult.stderr}`);
+                  continue;
+                }
+              }
+            }
+          }
+          summary.push(`- Would add ${repos.length} repos to "${lang}" list.`);
+          if (!dryRun) {
+            const listsData = await pi.exec("gh", ["api", "graphql", "-f", "query=query { viewer { lists(first: 100) { nodes { id name } } } }"], { timeout: 10000 });
+            if (listsData.code === 0) {
+              const lists = JSON.parse(listsData.stdout).data.viewer.lists.nodes;
+              const targetList = lists.find((l: any) => l.name.toLowerCase() === lang.toLowerCase());
+              if (targetList) {
+                const listId = targetList.id;
+                for (let i = 0; i < repos.length; i++) {
+                  const repo = repos[i];
+                  try {
+                    const repoData = await pi.exec("gh", ["repo", "view", repo, "--json", "id"], { timeout: 10000 });
+                    if (repoData.code !== 0) continue;
+                    const repoId = JSON.parse(repoData.stdout).id;
+                    const mutation = `mutation { updateUserListsForItem(input: {itemId: "${repoId}", listIds: ["${listId}"]}) { clientMutationId } }`;
+                    const mutRes = await pi.exec("gh", ["api", "graphql", "-f", `query=${mutation}`], { timeout: 10000 });
+                    if (mutRes.code === 0) changesMade++;
+                  } catch (_) { /* skip individual failures */ }
+                }
+              }
+            }
+          } else {
+            changesMade += repos.length;
+          }
+        }
+        const report = `Organization ${dryRun ? 'Plan' : 'Complete'}:\n- Processed ${uncategorized.length} repositories.\n- ${dryRun ? 'Would add' : 'Added'} ${changesMade} repositories to lists.\n\nSummary:\n${summary.join("\n")}\n`;
+        return { content: [{ type: "text", text: report }], details: { plan: summary, changesMade, dryRun } };
+      } catch (e) {
+        return { isError: true, content: [{ type: "text", text: "Error during organization: " + (e instanceof Error ? e.message : String(e)) }], details: {} };
+      }
+    }
+  });
 
   pi.registerCommand("starred", {
     description: "Browse starred repositories with fzf",
