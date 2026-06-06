@@ -1123,24 +1123,24 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
         const allLists = await fetchStarLists(pi, signal);
         const existingListNames = new Set(allLists.map(l => l.name.toLowerCase()));
 
-        // Build report
+        // Build compact report (token-efficient: no individual repos listed)
         const totalRepos = new Set<string>();
         qualified.forEach(([_, repos]) => repos.forEach(r => totalRepos.add(r)));
 
         const lines: string[] = [
-          `Topic Distribution (${qualified.length} topics with ≥${minRepos} repos):`,
+          `Topic Distribution (${qualified.length} topics with ≥${minRepos} repos, ${totalRepos.size} unique repos):`,
           "",
+          "| Topic | Repos | Status |",
+          "|-------|-------|--------|"
         ];
 
         for (const [topic, repos] of qualified) {
-          const status = existingListNames.has(topic.toLowerCase()) ? " (list exists)" : " (new list)";
-          lines.push(`**${topic}** — ${repos.length} repos${status}`);
-          lines.push(...repos.slice(0, 5).map(r => `  • ${r}`));
-          if (repos.length > 5) lines.push(`  ... and ${repos.length - 5} more`);
-          lines.push("");
+          const status = existingListNames.has(topic.toLowerCase()) ? "✓ exists" : "new";
+          lines.push(`| ${topic} | ${repos.length} | ${status} |`);
         }
 
-        lines.push(`📊 ${totalRepos.size} repos would be organized into ${qualified.length} topic lists.`);
+        lines.push("");
+        lines.push(`Use \`starred_repos\` with \`topic: "<topic>"\` to see individual repos for any topic above.`);
 
         if (!dryRun) {
           onUpdate?.({ content: [{ type: "text", text: "Executing organization..." }], details: {} });
