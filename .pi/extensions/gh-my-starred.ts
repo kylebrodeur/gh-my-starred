@@ -1078,10 +1078,11 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
     parameters: Type.Object({
       dryRun: Type.Optional(Type.Boolean({ description: "If true, reports the plan without executing. Defaults to false." })),
       minRepos: Type.Optional(Type.Number({ description: "Minimum repos sharing a topic to create a list (default: 3)." })),
-      limit: Type.Optional(Type.Number({ description: "Process a maximum of this many repos for topic analysis." }))
+      limit: Type.Optional(Type.Number({ description: "Process a maximum of this many repos for topic analysis." })),
+      topics: Type.Optional(Type.Array(Type.String(), { description: "Filter to specific topics only (e.g., ['mcp', 'ollama']). When set, ignores minRepos threshold." }))
     }),
     async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
-      const { dryRun = false, minRepos = 3, limit } = params;
+      const { dryRun = false, minRepos = 3, limit, topics: topicFilter } = params;
 
       onUpdate?.({ content: [{ type: "text", text: `Analyzing topic distribution across starred repos... (min ${minRepos} repos per topic)` }], details: {} });
 
@@ -1103,10 +1104,18 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
           }
         }
 
-        // Filter to topics meeting threshold
-        const qualified = Array.from(topicMap.entries())
-          .filter(([_, repos]) => repos.length >= minRepos)
-          .sort((a, b) => b[1].length - a[1].length);
+        // Filter to requested topics if specified, otherwise use minRepos threshold
+        let qualified: [string, string[]][];
+        if (topicFilter && topicFilter.length > 0) {
+          const filterSet = new Set(topicFilter.map((t: string) => t.toLowerCase()));
+          qualified = Array.from(topicMap.entries())
+            .filter(([topic]: [string, string[]]) => filterSet.has(topic.toLowerCase()))
+            .sort((a, b) => b[1].length - a[1].length);
+        } else {
+          qualified = Array.from(topicMap.entries())
+            .filter(([_, repos]) => repos.length >= minRepos)
+            .sort((a, b) => b[1].length - a[1].length);
+        }
 
         if (qualified.length === 0) {
           return {
