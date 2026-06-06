@@ -1068,6 +1068,189 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
     }
   });
 
+  pi.registerTool({
+    name: "organize_stars_by_topic",
+    label: "Organize Stars by Topic",
+    description: "Analyzes starred repositories by their GitHub topics (tags) and organizes them into topic-based star lists. Only creates lists for topics shared by enough repos.",
+    promptSnippet: "Group starred repositories by their GitHub topics, creating lists for common themes like 'cli', 'machine-learning', 'devops', etc.",
+    promptGuidelines: [
+      "Use this tool to discover topic clusters across your starred repos and organize them.",
+      "Set minRepos to control the threshold - only topics with at least that many repos get lists.",
+      "Always run with dryRun:true first to preview the plan before executing.",
+      "A repo can belong to multiple topic lists."
+    ],
+    parameters: Type.Object({
+      dryRun: Type.Optional(Type.Boolean({ description: "If true, reports the plan without executing. Defaults to false." })),
+      minRepos: Type.Optional(Type.Number({ description: "Minimum repos sharing a topic to create a list (default: 3)." })),
+      limit: Type.Optional(Type.Number({ description: "Process a maximum of this many repos for topic analysis." }))
+    }),
+    async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
+      const { dryRun = false, minRepos = 3, limit } = params;
+
+      onUpdate?.({ content: [{ type: "text", text: `Analyzing topic distribution across starred repos... (min ${minRepos} repos per topic)` }], details: {} });
+
+      try {
+        // Fetch all starred repos
+        let allRepos = await fetchStarredRepos(pi, signal);
+        if (limit) allRepos = allRepos.slice(0, limit);
+
+        onUpdate?.({ content: [{ type: "text", text: `Processing ${allRepos.length} repos for topic analysis...` }], details: {} });
+
+        // Build topic → repos map
+        const topicMap = new Map<string, string[]>();
+        for (const repo of allRepos) {
+          if (repo.topics && repo.topics.length > 0) {
+            for (const topic of repo.topics) {
+              if (!topicMap.has(topic)) topicMap.set(topic, []);
+              topicMap.get(topic)!.push(repo.full_name);
+            }
+          }
+        }
+
+        // Filter to topics meeting threshold
+        const qualified = Array.from(topicMap.entries())
+          .filter(([_, repos]) => repos.length >= minRepos)
+          .sort((a, b) => b[1].length - a[1].length);
+
+        if (qualified.length === 0) {
+          return {
+            content: [{ type: "text", text: `No topics found with ${minRepos}+ repos across ${allRepos.length} starred repos. Try a lower minRepos threshold.` }],
+            details: {}
+          };
+        }
+
+        // Fetch existing lists to avoid duplicates
+        const allLists = await fetchStarLists(pi, signal);
+        const existingListNames = new Set(allLists.map(l => l.name.toLowerCase()));
+
+        // Build report
+        const totalRepos = new Set<string>();
+        qualified.forEach(([_, repos]) => repos.forEach(r => totalRepos.add(r)));
+
+        const lines: string[] = [
+          `Topic Distribution (${qualified.length} topics with ≥${minRepos} repos):`,
+          "",
+        ];
+
+        for (const [topic, repos] of qualified) {
+          const status = existingListNames.has(topic.toLowerCase()) ? " (list exists)" : " (new list)";
+          lines.push(`**${topic}** — ${repos.length} repos${status}`);
+          lines.push(...repos.slice(0, 5).map(r => `  • ${r}`));
+          if (repos.length > 5) lines.push(`  ... and ${repos.length - 5} more`);
+          lines.push("");
+        }
+
+        lines.push(`📊 ${totalRepos.size} repos would be organized into ${qualified.length} topic lists.`);
+
+        if (!dryRun) {
+          onUpdate?.({ content: [{ type: "text", text: "Executing organization..." }], details: {} });
+
+          let listsCreated = 0;
+          let reposAdded = 0;
+          const errors: string[] = [];
+
+          for (const [topic, repos] of qualified) {
+            try {
+              // Find or create the list
+              let targetList = allLists.find(l => l.name.toLowerCase() === topic.toLowerCase());
+              if (!targetList) {
+                const userResult = await pi.exec("gh", ["api", "user", "--jq", ".id"], { timeout: 10000 });
+                if (userResult.code !== 0) throw new Error("Could not get user ID");
+                const userId = userResult.stdout.trim();
+                const mutation = `mutation { createUserList(input: {ownerId: "${userId}", name: "${topic}", description: "Repositories tagged with '${topic}'", isPublic: true}) { list { id name } } }`;
+                const createResult = await pi.exec("gh", ["api", "graphql", "-f", `query=${mutation}`], { timeout: 15000 });
+                if (createResult.code !== 0 && !createResult.stderr.includes("Name has already been taken")) {
+                  errors.push(`${topic}: Failed to create list - ${createResult.stderr}`);
+                  continue;
+                }
+                listsCreated++;
+                // Re-fetch to get the new list ID
+                const refreshedLists = await fetchStarLists(pi, signal);
+                targetList = refreshedLists.find(l => l.name.toLowerCase() === topic.toLowerCase());
+              }
+
+              if (!targetList) {
+                errors.push(`${topic}: Could not resolve list after creation`);
+                continue;
+              }
+
+              // Fetch list ID via GraphQL
+              const listsData = await pi.exec("gh", ["api", "graphql", "-f", "query=query { viewer { lists(first: 100) { nodes { id name } } } }"], { timeout: 10000 });
+              if (listsData.code !== 0) {
+                errors.push(`${topic}: Failed to fetch lists - ${listsData.stderr}`);
+                continue;
+              }
+              const lists = JSON.parse(listsData.stdout).data.viewer.lists.nodes;
+              const listObj = lists.find((l: any) => l.name.toLowerCase() === topic.toLowerCase());
+              if (!listObj) {
+                errors.push(`${topic}: List not found in GraphQL results`);
+                continue;
+              }
+              const listId = listObj.id;
+
+              // Fetch current list memberships for these repos
+              const repoToCurrentLists: Record<string, string[]> = {};
+              for (const list of lists) {
+                let hasNextPage = true, endCursor: string | null = null;
+                while (hasNextPage) {
+                  const cursorArg = endCursor ? `, after: "${endCursor}"` : "";
+                  const listQuery = `query { node(id: "${list.id}") { ... on UserList { items(first: 100${cursorArg}) { pageInfo { hasNextPage endCursor } nodes { ... on Repository { nameWithOwner } } } } } }`;
+                  const res = await pi.exec("gh", ["api", "graphql", "-f", `query=${listQuery}`], { timeout: 15000 });
+                  if (res.code !== 0) break;
+                  const itemsConn = JSON.parse(res.stdout).data.node.items;
+                  for (const item of itemsConn.nodes) {
+                    if (item?.nameWithOwner) {
+                      if (!repoToCurrentLists[item.nameWithOwner]) repoToCurrentLists[item.nameWithOwner] = [];
+                      repoToCurrentLists[item.nameWithOwner].push(list.id);
+                    }
+                  }
+                  hasNextPage = itemsConn.pageInfo.hasNextPage;
+                  endCursor = itemsConn.pageInfo.endCursor;
+                }
+              }
+
+              // Add each repo to the topic list
+              for (let i = 0; i < repos.length; i++) {
+                const repo = repos[i];
+                onUpdate?.({ content: [{ type: "text", text: `Adding to "${topic}": ${repo} (${i + 1}/${repos.length})` }], details: {} });
+                try {
+                  const repoData = await pi.exec("gh", ["repo", "view", repo, "--json", "id"], { timeout: 10000 });
+                  if (repoData.code !== 0) continue;
+                  const repoId = JSON.parse(repoData.stdout).id;
+                  const currentLists = repoToCurrentLists[repo] || [];
+                  const newListIds = Array.from(new Set([...currentLists, listId]));
+                  const listIdsFormatted = newListIds.map((id: string) => `"${id}"`).join(", ");
+                  const mutation = `mutation { updateUserListsForItem(input: {itemId: "${repoId}", listIds: [${listIdsFormatted}]}) { clientMutationId } }`;
+                  await pi.exec("gh", ["api", "graphql", "-f", `query=${mutation}`], { timeout: 10000 });
+                  reposAdded++;
+                } catch (_) { /* skip individual failures */ }
+              }
+            } catch (e) {
+              errors.push(`${topic}: ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
+
+          lines.push("");
+          lines.push(`✅ Created ${listsCreated} new lists, added ${reposAdded} repos.`);
+          if (errors.length > 0) {
+            lines.push(`⚠️ ${errors.length} errors:\n${errors.map(e => `  • ${e}`).join("\n")}`);
+          }
+        }
+
+        return {
+          content: [{ type: "text", text: lines.join("\n") }],
+          details: { topics: qualified.map(([t, r]) => ({ topic: t, repoCount: r.length, repos: r })), dryRun, minRepos }
+        };
+      } catch (e) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: "Error during topic organization: " + (e instanceof Error ? e.message : String(e)) }],
+          details: {}
+        };
+      }
+    }
+  });
+
   pi.registerCommand("starred", {
     description: "Browse starred repositories with fzf",
     handler: async (args: string, ctx: ExtensionContext) => {
