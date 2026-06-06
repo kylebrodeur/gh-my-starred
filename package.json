@@ -25,7 +25,8 @@
   },
   "pi": {
     "extensions": [
-      ".pi/extensions/gh-my-starred.ts"
+      ".pi/extensions/gh-my-starred.ts",
+      "node_modules/pi-librarian/extensions"
     ]
   },
   "scripts": {
@@ -44,6 +45,7 @@
     "pi-librarian": "^1.3.7",
     "sqlite3": "^6.0.1"
   },
+  "bundledDependencies": ["pi-librarian"],
   "exports": {
     ".": {
       "import": "./dist/index.js",
