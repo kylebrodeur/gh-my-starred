@@ -285,7 +285,8 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       "Use starred_repos when the user asks about their starred repos or needs to find something they previously starred",
       "Apply filters (language, topic) when the user specifies preferences",
       "Sort by 'stars' to find popular repos, 'updated' for recently active, 'name' for alphabetical",
-      "Use search for fuzzy matching repo names or descriptions"
+      "Use search for fuzzy matching repo names or descriptions",
+      "For deep investigation of a specific repo, use analyze_repo or the librarian tool"
     ],
     parameters: Type.Object({
       limit: Type.Optional(Type.Number({ description: "Maximum number of repos to return (default: 100, max: 500)" })),
@@ -914,19 +915,21 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "analyze_repo",
     label: "Analyze Repository",
-    description: "Fetches detailed, structured metadata for a specific GitHub repository.",
-    promptSnippet: "Get detailed information about a repository to understand its purpose, popularity, and technology stack.",
+    description: "Fetches detailed, structured metadata for a specific GitHub repository. Supports a deep mode that clones and explores the repo like the librarian tool.",
+    promptSnippet: "Get detailed information about a repository to understand its purpose, popularity, and technology stack. Use deep:true for code-level analysis.",
     promptGuidelines: [
       "Use analyze_repo to gather data for organizing or making decisions about a repository.",
       "You can specify which fields to fetch to keep the output focused and efficient.",
-      "This is the primary tool for gathering intelligence before using list management tools."
+      "Use deep:true for richer analysis that reads README, package.json, and directory structure.",
+      "For multi-repo code search across GitHub, prefer the librarian tool."
     ],
     parameters: Type.Object({
       repo: Type.String({ description: "The full name of the repository (e.g., 'owner/repo')." }),
-      fields: Type.Optional(Type.Array(Type.String(), { description: "Specific fields to fetch. Defaults to a comprehensive list." }))
+      fields: Type.Optional(Type.Array(Type.String(), { description: "Specific fields to fetch. Defaults to a comprehensive list." })),
+      deep: Type.Optional(Type.Boolean({ description: "If true, clones the repo and performs deep analysis (README, key config files, directory structure). Defaults to false." }))
     }),
     async execute(_toolCallId: string, params: Record<string, any>, signal: AbortSignal | undefined, onUpdate: ((u: {content: any[], details: any}) => void) | undefined, ctx: ExtensionContext) {
-      const { repo, fields } = params;
+      const { repo, fields, deep = false } = params;
       const defaultFields = ["name", "nameWithOwner", "description", "stargazerCount", "forkCount", "pushedAt", "licenseInfo", "languages", "topics", "owner", "url"];
       const fieldsToFetch = fields && fields.length > 0 ? fields : defaultFields;
       onUpdate?.({ content: [{ type: "text", text: `Analyzing repository: ${repo}...` }], details: {} });
@@ -943,7 +946,29 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
             .map((lang: any) => lang.node.name);
           repoData.languages = topLangs;
         }
-        return { content: [{ type: "text", text: `Successfully analyzed ${repo}. Use the 'details' view to see the structured data.` }], details: { analysis: repoData } };
+
+        if (deep) {
+          onUpdate?.({ content: [{ type: "text", text: `Deep analysis: cloning ${repo}...` }], details: {} });
+          const tmpDir = `/tmp/gh-my-starred-${repo.replace("/", "-")}-${Date.now()}`;
+          const cloneResult = await pi.exec("gh", ["repo", "clone", repo, tmpDir, "--", "--depth", "1"], { timeout: 30000 });
+          if (cloneResult.code === 0) {
+            const deepData: Record<string, string> = {};
+            for (const f of ["README.md", "package.json", "go.mod", "Cargo.toml", "pyproject.toml", "Makefile"]) {
+              try {
+                const content = await readFile(`${tmpDir}/${f}`, "utf-8");
+                deepData[f] = content.slice(0, 2000);
+              } catch (_) { /* file doesn't exist */ }
+            }
+            try {
+              const listResult = await pi.exec("ls", ["-la", tmpDir], { timeout: 5000 });
+              if (listResult.code === 0) deepData["_directory_listing"] = listResult.stdout.slice(0, 2000);
+            } catch (_) { /* ignore */ }
+            repoData._deep = deepData;
+            await pi.exec("rm", ["-rf", tmpDir], { timeout: 5000 }).catch(() => {});
+          }
+        }
+
+        return { content: [{ type: "text", text: `Successfully analyzed ${repo}.${deep ? ' Deep analysis included.' : ''} Use the 'details' view to see the structured data.` }], details: { analysis: repoData } };
       } catch (e) {
         return { isError: true, content: [{ type: "text", text: "Error analyzing repository: " + (e instanceof Error ? e.message : String(e)) }], details: {} };
       }
