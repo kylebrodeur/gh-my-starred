@@ -585,11 +585,8 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
       const { name, description } = params;
       onUpdate?.({ content: [{ type: "text", text: `Creating star list "${name}"...` }], details: {} });
       try {
-        const userResult = await pi.exec("gh", ["api", "user", "--jq", ".id"], { timeout: 10000 });
-        if (userResult.code !== 0) throw new Error("Could not determine GitHub user ID.");
-        const userId = userResult.stdout.trim();
         const descString = description ? `description: "${description}", ` : "";
-        const mutation = `mutation { createUserList(input: {ownerId: "${userId}", name: "${name}", ${descString}isPublic: true}) { list { name url } } }`;
+        const mutation = `mutation { createUserList(input: {name: "${name}", ${descString}}) { list { name } } }`;
         const result = await pi.exec("gh", ["api", "graphql", "-f", `query=${mutation}`], { timeout: 15000 });
         if (result.code !== 0) {
           if (result.stderr.includes("INSUFFICIENT_SCOPES")) {
@@ -601,8 +598,7 @@ export default function ghMyStarredExtension(pi: ExtensionAPI) {
           throw new Error(result.stderr);
         }
         const data = JSON.parse(result.stdout);
-        const listUrl = data.data.createUserList.list.url;
-        return { content: [{ type: "text", text: `Successfully created star list "${name}".\nView it here: ${listUrl}` }], details: { name, description, url: listUrl } };
+        return { content: [{ type: "text", text: `Successfully created star list "${name}".` }], details: { name, description } };
       } catch (e) {
         return { isError: true, content: [{ type: "text", text: "Error creating list: " + (e instanceof Error ? e.message : String(e)) }], details: {} };
       }
